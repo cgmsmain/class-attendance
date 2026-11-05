@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>스마트 학급 관리 시스템 | Smart Classroom PWA</title>
+  
+  <!-- PWA & Mobile Meta -->
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="스마트학급">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <!-- SheetJS CDN (엑셀 추출용) -->
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+  <!-- Google Fonts: Pretendard -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <!-- 상단 대시보드 헤더 바 (컴팩트 38px) -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="brand">
+          <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+            <line x1="8" y1="21" x2="16" y2="21"></line>
+            <line x1="12" y1="17" x2="12" y2="21"></line>
+          </svg>
+          <span class="brand-title">스마트 학급 관리</span>
+          <span class="brand-sub">전자칠판 OS</span>
+        </div>
+
+        <!-- 날짜 및 시계 -->
+        <div class="date-picker-wrap">
+          <label for="dateSelect" class="date-label">
+            <svg class="mini-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+          </label>
+          <input type="date" id="dateSelect" class="date-input">
+          <span id="liveClock" class="live-clock">--:--:--</span>
+        </div>
+
+        <!-- 학생 전체 인원 설정기 -->
+        <div class="student-count-wrap" title="학급의 전체 학생 인원수를 설정합니다">
+          <span class="count-label">인원:</span>
+          <select id="totalStudentsSelect" class="select-student-count">
+            <option value="15">15명</option>
+            <option value="16">16명</option>
+            <option value="17">17명</option>
+            <option value="18">18명</option>
+            <option value="19">19명</option>
+            <option value="20">20명</option>
+            <option value="21">21명</option>
+            <option value="22">22명</option>
+            <option value="23">23명</option>
+            <option value="24">24명</option>
+            <option value="25">25명</option>
+            <option value="26">26명</option>
+            <option value="27">27명</option>
+            <option value="28">28명</option>
+            <option value="29">29명</option>
+            <option value="30" selected>30명</option>
+            <option value="31">31명</option>
+            <option value="32">32명</option>
+            <option value="33">33명</option>
+            <option value="34">34명</option>
+            <option value="35">35명</option>
+            <option value="36">36명</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <!-- 자동 저장 인디케이터 -->
+        <div id="saveIndicator" class="save-status saved" title="모든 상태 변화가 로컬 스토리지에 즉시 저장됩니다">
+          <span class="pulse-dot"></span>
+          <span class="status-text">실시간 저장됨</span>
+        </div>
+
+        <!-- 액션 버튼 그룹 -->
+        <div class="btn-group">
+          <button id="btnQuickAllPresent" class="btn btn-secondary" title="오늘 모든 교시를 출석으로 일괄 처리합니다">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M20 6L9 17l-5-5"></path>
+            </svg>
+            <span>전체 출석</span>
+          </button>
+
+          <button id="btnToggleSeatMode" class="btn btn-accent" title="모둠 모드로 전환 시 자동으로 랜덤 배치되며, 드래그로 자유롭게 자리 이동 가능합니다">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="7" height="7"></rect>
+              <rect x="14" y="3" width="7" height="7"></rect>
+              <rect x="14" y="14" width="7" height="7"></rect>
+              <rect x="3" y="14" width="7" height="7"></rect>
+            </svg>
+            <span id="seatModeText">모둠 모드 (랜덤)</span>
+          </button>
+
+          <button id="btnMonthlyReset" class="btn btn-warning" title="매월 1일 번호를 무작위로 섞어 좌석(사용 안 함 제외)과 청소 역할에 균등 재배치합니다">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>매월 1일 리셋</span>
+          </button>
+
+          <button id="btnExportExcel" class="btn btn-excel" title="나이스(NEIS) RPA용 엑셀 추출: 현황 제외, 조례부터 요일별 마지막 교시(월수금 6교시, 화목 7교시)까지만 깔끔하게 다운로드합니다">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <span>엑셀 다운로드</span>
+          </button>
+
+          <button id="btnFullscreen" class="btn btn-icon-only" title="전자칠판 전체화면">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- 3분할 메인 콘텐츠 (100% 무스크롤 뷰포트 피팅) -->
+    <main class="main-layout">
+      <!-- 1. 좌측 50%: 실시간 출석 체크 패널 (월수금 6교시 / 화목 7교시, 결과류 포함, 결석/조퇴 이후 교시 자동 반영) -->
+      <section class="panel panel-left panel-attendance">
+        <div class="panel-header">
+          <div class="panel-title-wrap">
+            <h2 class="panel-title">
+              <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 11l3 3L22 4"></path>
+                <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+              </svg>
+              실시간 출석 체크
+            </h2>
+            <span id="periodScheduleBadge" class="badge-total">월수금 6교시 / 화목 7교시</span>
+          </div>
+
+          <!-- 실시간 집계 카드 (결과류 포함) -->
+          <div class="summary-pills">
+            <div class="summary-pill pill-present" title="정상 출석">
+              <span class="pill-dot"></span>
+              <span class="pill-label">출석</span>
+              <span id="sumPresentCount" class="pill-num">30</span>
+            </div>
+            <div class="summary-pill pill-absent" title="결석 (인정/병/미인정)">
+              <span class="pill-dot"></span>
+              <span class="pill-label">결석</span>
+              <span id="sumAbsentCount" class="pill-num">0</span>
+            </div>
+            <div class="summary-pill pill-tardy" title="지각 (인정/병/미인정)">
+              <span class="pill-dot"></span>
+              <span class="pill-label">지각</span>
+              <span id="sumTardyCount" class="pill-num">0</span>
+            </div>
+            <div class="summary-pill pill-early" title="조퇴 (인정/병/미인정)">
+              <span class="pill-dot"></span>
+              <span class="pill-label">조퇴</span>
+              <span id="sumEarlyCount" class="pill-num">0</span>
+            </div>
+            <div class="summary-pill pill-class-skip" title="결과 (인정결과/병결과/미인정결과)">
+              <span class="pill-dot"></span>
+              <span class="pill-label">결과</span>
+              <span id="sumSkipCount" class="pill-num">0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 출석 테이블 컨테이너 (스크롤 없이 학생 수만큼 균등 분할) -->
+        <div class="table-scroll-container">
+          <table class="attendance-table" id="attendanceTable">
+            <thead id="attendanceTableHead">
+              <!-- JS에서 요일에 따라 동적 생성 (월수금 6교시 / 화목 7교시) -->
+            </thead>
+            <tbody id="attendanceTableBody">
+              <!-- JS 동적 렌더링 -->
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="table-footer-hint">
+          <span class="hint-item"><span class="legend-box lg-absent"></span>결석류</span>
+          <span class="hint-item"><span class="legend-box lg-tardy"></span>지각류</span>
+          <span class="hint-item"><span class="legend-box lg-early"></span>조퇴류</span>
+          <span class="hint-item"><span class="legend-box lg-skip"></span>결과류</span>
+          <span id="weekdayHintText" class="hint-item schedule-text">월·수·금 6교시 / 화·목 7교시</span>
+          <span class="hint-item auto-cascade-hint">💡 결석/조퇴 시 이후 교시 자동 적용</span>
+        </div>
+      </section>
+
+      <!-- 2 & 3. 우측 50%: 상단 좌석 배치도(오른쪽 아래 1번 시작) + 하단 청소 역할 배정표(정원 반영 랜덤 분배) -->
+      <section class="panel-right-split">
+        <!-- 우측 상단 (54% 높이): 교사 시점 좌석 배치도 (오른쪽 아래 1번 -> 왼쪽으로 증가) -->
+        <div class="panel panel-seat">
+          <div class="panel-header compact-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title">
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                좌석 배치도 <span class="perspective-tag">(우측하단 1번 ➔ 좌측)</span>
+              </h2>
+            </div>
+
+            <!-- 좌석 배치 설정 (가로/세로 지정, 모둠 수 지정 & 출결 기준) -->
+            <div class="seat-controls">
+              <!-- 일반 모드 크기 조절 (가로 열 × 세로 행) -->
+              <div id="seatDimensionControl" class="seat-dimension-wrap" title="일반 모드 가로 열 수와 세로 행 수를 지정합니다">
+                <span class="dim-label">배열:</span>
+                <select id="seatColsSelect" class="select-dim">
+                  <option value="4">4열</option>
+                  <option value="5">5열</option>
+                  <option value="6" selected>6열</option>
+                  <option value="7">7열</option>
+                  <option value="8">8열</option>
+                </select>
+                <span class="dim-cross">×</span>
+                <select id="seatRowsSelect" class="select-dim">
+                  <option value="4">4행</option>
+                  <option value="5" selected>5행</option>
+                  <option value="6">6행</option>
+                  <option value="7">7행</option>
+                  <option value="8">8행</option>
+                </select>
+              </div>
+
+              <!-- 모둠 모드 설정: 모둠 수 지정 및 랜덤 재배치 버튼 -->
+              <div id="groupCountControl" class="group-count-wrap" style="display: none;" title="모둠 수를 지정하고 균등 랜덤 재배치할 수 있습니다">
+                <span class="dim-label">모둠 수:</span>
+                <select id="groupCountSelect" class="select-dim">
+                  <option value="3">3모둠</option>
+                  <option value="4">4모둠</option>
+                  <option value="5">5모둠</option>
+                  <option value="6" selected>6모둠</option>
+                  <option value="7">7모둠</option>
+                  <option value="8">8모둠</option>
+                </select>
+                <button type="button" id="btnReshuffleGroups" class="btn-group-reshuffle" title="현재 모둠 수에 맞춰 학생들을 무작위(랜덤)로 다시 균등 배분합니다">
+                  🎲 재배치
+                </button>
+              </div>
+
+              <!-- 교시 기준 필터 (요일별 동적 옵션) -->
+              <div class="seat-period-select-wrap">
+                <label for="seatPeriodFilter">출결:</label>
+                <select id="seatPeriodFilter" class="select-period-filter">
+                  <!-- JS에서 동적 채움 -->
+                </select>
+              </div>
+
+              <span class="seat-guide-hint" title="좌석 카드의 🚫 아이콘 또는 더블클릭 시 '사용 안 하는 자리'로 전환됩니다">💡 🚫클릭: 자리 비활성화</span>
+            </div>
+          </div>
+
+          <!-- 좌석 그리드 뷰 컨테이너 (스크롤 0) -->
+          <div class="seat-view-container" id="seatContainer">
+            <!-- JS 동적 렌더링 -->
+          </div>
+
+          <!-- 전자칠판 교탁 / 칠판 위치 바 (교사 시점: 화면 아래쪽에 배치) -->
+          <div class="podium-bar podium-bottom">
+            <span class="podium-line"></span>
+            <div class="podium-center">
+              <svg class="podium-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="2" y="3" width="20" height="14" rx="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+              </svg>
+              <span>[ 교탁 및 전자칠판 (교실 앞) ] ➔ 우측 맨 앞줄이 1번 자리</span>
+            </div>
+            <span class="podium-line"></span>
+          </div>
+        </div>
+
+        <!-- 우측 하단 (46% 높이): 청소 역할 배정표 (인원수 지정 100% 반영 랜덤 자동 분배) -->
+        <div class="panel panel-cleaning">
+          <div class="panel-header compact-header">
+            <div class="panel-title-wrap">
+              <h2 class="panel-title">
+                <svg class="panel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                </svg>
+                청소 역할 배정표
+              </h2>
+              <span id="cleaningTotalCountBadge" class="badge-role-info">총 7개 구역</span>
+            </div>
+
+            <div class="cleaning-header-actions">
+              <button id="btnAddCleaningRole" class="btn btn-xs btn-secondary" title="새로운 청소 구역을 추가합니다">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>구역 추가</span>
+              </button>
+
+              <!-- 청소 인원수 설정 반영 랜덤 자동 분배 버튼 -->
+              <button id="btnRandomCleaning" class="btn btn-xs btn-accent" title="각 구역의 지정 인원수(목표 정원)에 맞춰 학생들을 무작위(랜덤)로 즉시 재배치합니다">
+                <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
+                  <circle cx="8" cy="8" r="1.5" fill="currentColor"></circle>
+                  <circle cx="16" cy="8" r="1.5" fill="currentColor"></circle>
+                  <circle cx="12" cy="12" r="1.5" fill="currentColor"></circle>
+                  <circle cx="8" cy="16" r="1.5" fill="currentColor"></circle>
+                  <circle cx="16" cy="16" r="1.5" fill="currentColor"></circle>
+                </svg>
+                <span>청소 랜덤 분배</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- 청소 역할 박스 그리드 (동적 추가/삭제 & 스크롤 0) -->
+          <div class="cleaning-roles-grid" id="cleaningRolesGrid">
+            <!-- JS 동적 렌더링 -->
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- 모달: 청소 구역 추가 모달 -->
+    <div id="addRoleModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-icon-wrap accent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+          </div>
+          <h3>새 청소 구역 추가</h3>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="newRoleName">구역 이름:</label>
+            <input type="text" id="newRoleName" class="form-input" placeholder="예: 특별실 청소, 분리수거함 등" maxlength="15">
+          </div>
+          <div class="form-group">
+            <label for="newRoleTargetCount">지정 인원수 (목표 정원):</label>
+            <div class="number-stepper">
+              <button type="button" id="btnStepperMinus" class="btn-stepper">-</button>
+              <input type="number" id="newRoleTargetCount" class="form-input text-center" value="4" min="1" max="15">
+              <button type="button" id="btnStepperPlus" class="btn-stepper">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnCancelAddRole" class="btn btn-secondary">취소</button>
+          <button id="btnConfirmAddRole" class="btn btn-accent">구역 추가</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모달: 매월 1일 리셋 확인 대화상자 -->
+    <div id="resetModal" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <div class="modal-icon-wrap warning">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </div>
+          <h3>매월 1일 자리 및 청소 역할 재배치</h3>
+        </div>
+        <div class="modal-body">
+          <p>전체 학생을 무작위로 섞어 <strong>좌석(사용 안 하는 자리 제외)</strong>과 <strong>청소 역할(설정 인원수 반영)</strong>에 무작위 재배치하시겠습니까?</p>
+          <div class="reset-preview-box">
+            <ul>
+              <li>✓ 사용 안 하는 자리는 그대로 비워두고 유효 좌석에만 랜덤 배치</li>
+              <li>✓ 각 청소 구역의 지정 인원수(목표 정원)에 맞춰 무작위 배정</li>
+              <li>✓ 모든 변경 사항은 즉시 로컬 스토리지에 자동 저장됨</li>
+            </ul>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnCancelReset" class="btn btn-secondary">취소</button>
+          <button id="btnConfirmReset" class="btn btn-warning-confirm">무작위 재배치 실행</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 토스트 알림 메시지 -->
+    <div id="toastContainer" class="toast-container"></div>
+  </div>
+
+  <script src="./app.js"></script>
+</body>
+</html>

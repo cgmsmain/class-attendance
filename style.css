@@ -360,6 +360,17 @@ body {
   background: linear-gradient(135deg, #0f766e, #0d9488);
 }
 
+.btn-danger-soft {
+  background: rgba(251, 113, 133, 0.16);
+  color: #fda4af;
+  border-color: rgba(251, 113, 133, 0.45);
+}
+.btn-danger-soft:hover {
+  background: rgba(251, 113, 133, 0.28);
+  border-color: #fb7185;
+  color: #ffffff;
+}
+
 .btn-icon-only {
   padding: 4px 7px;
   background: var(--bg-card);
@@ -495,6 +506,42 @@ body {
   font-size: 0.68rem;
   color: #93c5fd;
   font-weight: 700;
+}
+
+.panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-delete-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(251, 113, 133, 0.12);
+  color: #fda4af;
+  border: 1px solid rgba(251, 113, 133, 0.35);
+  border-radius: var(--radius-sm);
+  padding: 1px 6px;
+  font-size: 0.65rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  height: 20px;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+.btn-delete-date:hover {
+  background: rgba(251, 113, 133, 0.28);
+  border-color: #fb7185;
+  color: #ffffff;
+}
+
+.btn-icon-xs {
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
 }
 
 /* 요약 통계 배지 (소프트 파스텔 톤) */
@@ -1450,6 +1497,54 @@ body {
   justify-content: center;
 }
 .modal-icon-wrap.accent svg { width: 18px; height: 18px; }
+
+.modal-icon-wrap.danger {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(251, 113, 133, 0.18);
+  color: #fb7185;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-icon-wrap.danger svg { width: 18px; height: 18px; }
+
+.reset-warning-desc {
+  font-size: 0.82rem;
+  color: #f1f5f9;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+
+.reset-preview-box.danger-box {
+  background: rgba(251, 113, 133, 0.08);
+  border: 1px solid rgba(251, 113, 133, 0.35);
+}
+.reset-preview-box.danger-box li {
+  color: #fecdd3;
+  margin-bottom: 4px;
+}
+
+.btn-danger-confirm {
+  background: #f43f5e;
+  color: #ffffff;
+  font-weight: 800;
+  border: 1px solid #e11d48;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-danger-confirm:disabled {
+  background: #334155;
+  color: #94a3b8;
+  border-color: #475569;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.btn-danger-confirm:not(:disabled):hover {
+  background: #e11d48;
+  box-shadow: 0 0 12px rgba(244, 63, 94, 0.5);
+}
 
 .modal-header h3 {
   font-size: 1rem;

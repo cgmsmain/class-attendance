@@ -1767,6 +1767,43 @@ function executeMonthlyReset() {
   showToast('매월 1일 리셋 완료! (사용 안 하는 자리는 비워둔 채 좌석, 모둠, 청소가 모두 균등 랜덤 재배치되었습니다)', 'success');
 }
 
+/**
+ * 1년 주기 담임 교체용 새 학년도 전체 초기화 (공장 초기화)
+ * - 지금까지 누적된 모든 날짜의 출결 기록 완전 삭제
+ * - 좌석 배치 및 비활성화 좌석(사용 안 하는 자리) 초기화
+ * - 청소 구역 및 모둠 배정 초기화
+ */
+function executeYearlyFullReset() {
+  // 1. 모든 누적 출결 데이터 완전 삭제
+  appState.attendanceRecords = {};
+
+  // 2. 좌석 배치 완전 초기화 (비활성화 해제 및 1번부터 기본 순차 배치)
+  const totalSeats = (appState.seatCols || 6) * (appState.seatRows || 5);
+  appState.seats = Array.from({ length: totalSeats }, (_, i) => (i < appState.totalStudents ? i + 1 : null));
+  appState.disabledSeats = [];
+
+  // 3. 모둠 좌석 균등 재배치
+  distributeGroupsEqually();
+
+  // 4. 청소 구역 기본값으로 복원 및 무작위 배분
+  appState.cleaningRoles = JSON.parse(JSON.stringify(DEFAULT_CLEANING_ROLES));
+  distributeCleaningRolesRandomly();
+  appState.unassignedCleaning = [];
+
+  // 5. 오늘 날짜로 재설정
+  appState.selectedDate = getTodayString();
+  const dateInput = document.getElementById('dateSelect');
+  if (dateInput) dateInput.value = appState.selectedDate;
+
+  // 6. 즉시 저장 및 렌더링
+  saveStateImmediately();
+  renderAttendanceTable();
+  renderSeats();
+  renderCleaningRoles();
+
+  showToast('새 학년도 전체 데이터 초기화 완료! 모든 출결과 배치가 백지상태로 리셋되었습니다.', 'success');
+}
+
 function setAllPresentToday() {
   const date = appState.selectedDate;
   const periods = getPeriodsForDate(date);
@@ -1807,6 +1844,44 @@ function setupEventListeners() {
   const btnAllPresent = document.getElementById('btnQuickAllPresent');
   if (btnAllPresent) {
     btnAllPresent.addEventListener('click', setAllPresentToday);
+  }
+
+  const btnDeleteDateRecords = document.getElementById('btnDeleteDateRecords');
+  if (btnDeleteDateRecords) {
+    btnDeleteDateRecords.addEventListener('click', () => {
+      const date = appState.selectedDate;
+      const records = appState.attendanceRecords[date];
+
+      if (!records) {
+        showToast(`[${date}] 날짜에는 저장된 출결 기록이 없습니다.`, 'info');
+        return;
+      }
+
+      // 비정상 출결 기록이 있는지 체크
+      const periods = getPeriodsForDate(date);
+      let hasAnomaly = false;
+      for (const sid in records) {
+        for (const p of periods) {
+          if (records[sid] && records[sid][p] && records[sid][p] !== '출석') {
+            hasAnomaly = true;
+            break;
+          }
+        }
+        if (hasAnomaly) break;
+      }
+
+      const confirmMsg = hasAnomaly
+        ? `[${date}] 날짜의 모든 출결 기록을 데이터베이스에서 완전히 삭제하시겠습니까?\n\n※ 삭제 시 나이스(NEIS) RPA 엑셀 추출에서도 이 날짜가 완전히 제외됩니다.`
+        : `[${date}] 날짜의 출결 기록을 데이터베이스에서 완전히 삭제하시겠습니까? (엑셀 추출 제외)`;
+
+      if (confirm(confirmMsg)) {
+        delete appState.attendanceRecords[date];
+        saveStateImmediately();
+        renderAttendanceTable();
+        renderSeats();
+        showToast(`[${date}] 날짜의 출결 데이터가 완전히 삭제되었습니다. (엑셀 추출 제외)`, 'warning');
+      }
+    });
   }
 
   const btnToggleSeatMode = document.getElementById('btnToggleSeatMode');
@@ -1967,6 +2042,42 @@ function setupEventListeners() {
   const btnExportExcel = document.getElementById('btnExportExcel');
   if (btnExportExcel) {
     btnExportExcel.addEventListener('click', exportAttendanceToExcel);
+  }
+
+  // 새 학년도 전체 초기화 (1년 주기 담임 교체용)
+  const btnYearlyFullReset = document.getElementById('btnYearlyFullReset');
+  const yearlyResetModal = document.getElementById('yearlyResetModal');
+  const btnCancelYearlyReset = document.getElementById('btnCancelYearlyReset');
+  const btnConfirmYearlyReset = document.getElementById('btnConfirmYearlyReset');
+  const yearlyResetConfirmInput = document.getElementById('yearlyResetConfirmInput');
+
+  if (btnYearlyFullReset && yearlyResetModal) {
+    btnYearlyFullReset.addEventListener('click', () => {
+      if (yearlyResetConfirmInput) yearlyResetConfirmInput.value = '';
+      if (btnConfirmYearlyReset) btnConfirmYearlyReset.disabled = true;
+      yearlyResetModal.classList.remove('hidden');
+      if (yearlyResetConfirmInput) yearlyResetConfirmInput.focus();
+    });
+  }
+
+  if (yearlyResetConfirmInput && btnConfirmYearlyReset) {
+    yearlyResetConfirmInput.addEventListener('input', (e) => {
+      const isMatched = e.target.value.trim() === '초기화';
+      btnConfirmYearlyReset.disabled = !isMatched;
+    });
+  }
+
+  if (btnCancelYearlyReset && yearlyResetModal) {
+    btnCancelYearlyReset.addEventListener('click', () => {
+      yearlyResetModal.classList.add('hidden');
+    });
+  }
+
+  if (btnConfirmYearlyReset && yearlyResetModal) {
+    btnConfirmYearlyReset.addEventListener('click', () => {
+      yearlyResetModal.classList.add('hidden');
+      executeYearlyFullReset();
+    });
   }
 
   const btnFullscreen = document.getElementById('btnFullscreen');

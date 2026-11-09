@@ -45,6 +45,143 @@ function getTodayString() {
 }
 
 /**
+ * 학교 교시별 표준 시간표 (분 단위 기준)
+ * - 1교시: 09:00 ~ 09:45
+ * - 2교시: 09:55 ~ 10:40
+ * - 3교시: 10:50 ~ 11:35
+ * - 4교시: 11:45 ~ 12:30 (점심시간: 12:30 ~ 13:40)
+ * - 5교시: 13:40 ~ 14:25
+ * - 6교시: 14:35 ~ 15:20
+ * - 7교시: 15:30 ~ 16:15 (화·목)
+ */
+const PERIOD_TIMETABLE = [
+  { period: '조례', startHour: 8, startMin: 30, endHour: 9, endMin: 0, timeStr: '08:30~09:00' },
+  { period: '1교시', startHour: 9, startMin: 0, endHour: 9, endMin: 45, timeStr: '09:00~09:45' },
+  { period: '2교시', startHour: 9, startMin: 55, endHour: 10, endMin: 40, timeStr: '09:55~10:40' },
+  { period: '3교시', startHour: 10, startMin: 50, endHour: 11, endMin: 35, timeStr: '10:50~11:35' },
+  { period: '4교시', startHour: 11, startMin: 45, endHour: 12, endMin: 30, timeStr: '11:45~12:30' },
+  { period: '5교시', startHour: 13, startMin: 40, endHour: 14, endMin: 25, timeStr: '13:40~14:25' },
+  { period: '6교시', startHour: 14, startMin: 35, endHour: 15, endMin: 20, timeStr: '14:35~15:20' },
+  { period: '7교시', startHour: 15, startMin: 30, endHour: 16, endMin: 15, timeStr: '15:30~16:15' }
+];
+
+/**
+ * 현재 시각에 따라 현재 교시 및 실시간 수업 상태 반환
+ */
+function getCurrentLivePeriodInfo(dateStr = appState.selectedDate) {
+  const isToday = (dateStr === getTodayString());
+  const periods = getPeriodsForDate(dateStr);
+  const hasSeventh = periods.includes('7교시');
+
+  if (!isToday) {
+    return {
+      isToday: false,
+      period: 'auto',
+      isAfterSchool: true,
+      label: `선택 날짜: ${dateStr}`
+    };
+  }
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  // 1) 09:00 이전: 조례 시간
+  if (currentMinutes < 540) {
+    return {
+      isToday: true,
+      period: '조례',
+      isAfterSchool: false,
+      label: '조례 시간 (08:30~09:00)'
+    };
+  }
+  // 2) 1교시 (09:00 ~ 09:45) + 쉬는시간 (09:45 ~ 09:55)
+  if (currentMinutes < 595) {
+    const isBreak = currentMinutes >= 585;
+    return {
+      isToday: true,
+      period: '1교시',
+      isAfterSchool: false,
+      label: isBreak ? '쉬는 시간 (1교시 종료)' : '1교시 진행 중 (09:00~09:45)'
+    };
+  }
+  // 3) 2교시 (09:55 ~ 10:40) + 쉬는시간 (10:40 ~ 10:50)
+  if (currentMinutes < 650) {
+    const isBreak = currentMinutes >= 640;
+    return {
+      isToday: true,
+      period: '2교시',
+      isAfterSchool: false,
+      label: isBreak ? '쉬는 시간 (2교시 종료)' : '2교시 진행 중 (09:55~10:40)'
+    };
+  }
+  // 4) 3교시 (10:50 ~ 11:35) + 쉬는시간 (11:35 ~ 11:45)
+  if (currentMinutes < 705) {
+    const isBreak = currentMinutes >= 695;
+    return {
+      isToday: true,
+      period: '3교시',
+      isAfterSchool: false,
+      label: isBreak ? '쉬는 시간 (3교시 종료)' : '3교시 진행 중 (10:50~11:35)'
+    };
+  }
+  // 5) 4교시 (11:45 ~ 12:30) + 점심시간 (12:30 ~ 13:40)
+  if (currentMinutes < 820) {
+    const isLunch = currentMinutes >= 750;
+    return {
+      isToday: true,
+      period: '4교시',
+      isAfterSchool: false,
+      label: isLunch ? '점심 시간 (4교시 기준)' : '4교시 진행 중 (11:45~12:30)'
+    };
+  }
+  // 6) 5교시 (13:40 ~ 14:25) + 쉬는시간 (14:25 ~ 14:35)
+  if (currentMinutes < 875) {
+    const isBreak = currentMinutes >= 865;
+    return {
+      isToday: true,
+      period: '5교시',
+      isAfterSchool: false,
+      label: isBreak ? '쉬는 시간 (5교시 종료)' : '5교시 진행 중 (13:40~14:25)'
+    };
+  }
+  // 7) 6교시 (14:35 ~ 15:20) + 쉬는시간 (15:20 ~ 15:30)
+  if (currentMinutes < 930) {
+    const isBreak = currentMinutes >= 920;
+    if (!hasSeventh && currentMinutes >= 920) {
+      return {
+        isToday: true,
+        period: '6교시',
+        isAfterSchool: true,
+        label: '방과 후 (당일 종합 출결)'
+      };
+    }
+    return {
+      isToday: true,
+      period: '6교시',
+      isAfterSchool: false,
+      label: isBreak ? '쉬는 시간 (6교시 종료)' : '6교시 진행 중 (14:35~15:20)'
+    };
+  }
+  // 8) 7교시 (15:30 ~ 16:15) - 화·목만 해당
+  if (hasSeventh && currentMinutes <= 975) {
+    return {
+      isToday: true,
+      period: '7교시',
+      isAfterSchool: false,
+      label: '7교시 진행 중 (15:30~16:15)'
+    };
+  }
+
+  // 9) 모든 수업 종료 이후 (방과 후 / 종례)
+  return {
+    isToday: true,
+    period: hasSeventh ? '7교시' : '6교시',
+    isAfterSchool: true,
+    label: '방과 후 (당일 종합 출결)'
+  };
+}
+
+/**
  * 요일별 교시 목록 반환 (월/수/금: 6교시, 화/목: 7교시)
  */
 function getPeriodsForDate(dateStr = appState.selectedDate) {
@@ -449,8 +586,9 @@ function getStudentSummaryStatus(studentId, date = appState.selectedDate) {
   const records = getStudentAttendance(studentId, date);
   const periods = getPeriodsForDate(date);
 
-  if (filter !== 'auto' && periods.includes(filter) && records[filter]) {
-    const st = records[filter];
+  // 1) 선생님이 특정 교시('조례', '1교시', ...)를 직접 선택한 경우
+  if (filter !== 'auto' && periods.includes(filter)) {
+    const st = records[filter] || '출석';
     return {
       status: st,
       category: getStatusCategory(st),
@@ -458,7 +596,21 @@ function getStudentSummaryStatus(studentId, date = appState.selectedDate) {
     };
   }
 
-  // 우선순위: 결석 > 조퇴 > 결과 > 지각 > 출석
+  // 2) 종합(auto) 모드:
+  // 오늘 날짜이고 수업 시간 내(조례~마지막 교시)라면 현재 시간표의 현재 교시 상태를 실시간 반영!
+  // 예: 3교시 결과였어도 4교시에는 4교시 상태(정상 출석)로 자동 전환됨!
+  const liveInfo = getCurrentLivePeriodInfo(date);
+  if (liveInfo.isToday && !liveInfo.isAfterSchool && periods.includes(liveInfo.period)) {
+    const liveStatus = records[liveInfo.period] || '출석';
+    return {
+      status: liveStatus,
+      category: getStatusCategory(liveStatus),
+      label: liveStatus
+    };
+  }
+
+  // 3) 모든 수업 종료(방과 후/종례) 후이거나, 과거/미래 날짜인 경우:
+  // 하루 전체 중 대표 이상 출결(우선순위: 결석 > 조퇴 > 결과 > 지각 > 출석)을 종합 반영
   let worstCategory = 'present';
   let representativeStatus = '출석';
 
@@ -612,7 +764,7 @@ function updatePeriodFilterOptions() {
   const periods = getPeriodsForDate();
   const currentVal = appState.seatPeriodFilter;
 
-  let optsHtml = `<option value="auto">종합</option>`;
+  let optsHtml = `<option value="auto">종합 (실시간 시간표 자동)</option>`;
   periods.forEach(p => {
     const selected = currentVal === p ? 'selected' : '';
     optsHtml += `<option value="${p}" ${selected}>${p}</option>`;
@@ -623,6 +775,35 @@ function updatePeriodFilterOptions() {
     appState.seatPeriodFilter = 'auto';
     filterSelect.value = 'auto';
   }
+
+  updateLivePeriodBadge();
+}
+
+/**
+ * 좌석 배치도 헤더의 실시간 교시 안내 뱃지 갱신
+ */
+function updateLivePeriodBadge() {
+  const badge = document.getElementById('livePeriodBadge');
+  const textEl = document.getElementById('livePeriodText');
+  if (!badge || !textEl) return;
+
+  const info = getCurrentLivePeriodInfo(appState.selectedDate);
+  const filter = appState.seatPeriodFilter;
+
+  if (filter !== 'auto') {
+    textEl.textContent = `${filter} 기준 표시`;
+    badge.title = `출결 필터: ${filter} 상태를 고정 표시하고 있습니다`;
+    return;
+  }
+
+  if (!info.isToday) {
+    textEl.textContent = `당일 종합 (${appState.selectedDate})`;
+    badge.title = `선택된 날짜(${appState.selectedDate})의 출결 종합 현황입니다`;
+    return;
+  }
+
+  textEl.textContent = info.label;
+  badge.title = `실시간 시간표 동기화 중: 현재 시간(${info.label})에 따라 좌석 출결이 자동 반영됩니다`;
 }
 
 /**
@@ -1587,53 +1768,241 @@ function setupTouchDragForChip(chip) {
 }
 
 // ============================================================================
-// 12. 엑셀 다운로드 (현황 제외, 조례부터 각 요일의 마지막 교시까지만 추출!)
+// 12. 엑셀 다운로드 (기간 설정 & 정상 출석 제외 이상 출결 전용 필터 지원)
 // ============================================================================
-function exportAttendanceToExcel() {
-  const date = appState.selectedDate;
-  const currentPeriods = getPeriodsForDate(date); // 월수금: 조례~6교시, 화목: 조례~7교시
+function openExcelExportModal() {
+  const modal = document.getElementById('excelExportModal');
+  const startDateInput = document.getElementById('excelStartDate');
+  const endDateInput = document.getElementById('excelEndDate');
+  const onlyAnomaliesCheck = document.getElementById('excelOnlyAnomalies');
 
-  // 1. Sheet 1: 나이스 RPA 자동 입력용 정규화 DB
-  const rpaRows = [];
-  rpaRows.push(['일자', '학번', '교시', '출결구분', '비고', '시스템등록일시']);
+  if (!modal) {
+    executeExcelExport(appState.selectedDate, appState.selectedDate, true);
+    return;
+  }
 
+  // 기본값 설정: 이번 달 1일 ~ 현재 선택된 일자(또는 오늘)
+  const baseDateStr = appState.selectedDate || getTodayString();
+  const d = new Date(baseDateStr + 'T00:00:00');
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const firstDayOfMonth = `${y}-${m}-01`;
+
+  if (startDateInput) startDateInput.value = firstDayOfMonth;
+  if (endDateInput) endDateInput.value = baseDateStr;
+  if (onlyAnomaliesCheck) onlyAnomaliesCheck.checked = true;
+
+  modal.classList.remove('hidden');
+}
+
+function formatDateToYmd(dateObj) {
+  const y = dateObj.getFullYear();
+  const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * 나이스 RPA 엑셀 생성 및 다운로드 실행
+ * @param {string} startDate - 시작일 (YYYY-MM-DD)
+ * @param {string} endDate - 종료일 (YYYY-MM-DD)
+ * @param {boolean} onlyAnomalies - true이면 결석/지각/조퇴/결과 이상 출결 건만 추출, false이면 정상 출석 포함
+ */
+function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
   const nowIso = new Date().toISOString();
-  const allDates = Object.keys(appState.attendanceRecords).sort();
-  if (!allDates.includes(date)) allDates.push(date);
 
-  allDates.forEach((recordDate) => {
+  // 1. 기간 내 모든 유효 날짜 수집 (시작일 ~ 종료일)
+  const targetDates = [];
+  const startObj = new Date(startDate + 'T00:00:00');
+  const endObj = new Date(endDate + 'T00:00:00');
+
+  for (let dt = new Date(startObj); dt <= endObj; dt.setDate(dt.getDate() + 1)) {
+    const dayOfWeek = dt.getDay();
+    const dStr = formatDateToYmd(dt);
+    // 주말(일=0, 토=6)은 기본 제외하되, 주말에 출결 데이터가 있는 경우엔 포함
+    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+      targetDates.push(dStr);
+    } else if (appState.attendanceRecords[dStr]) {
+      targetDates.push(dStr);
+    }
+  }
+
+  if (targetDates.length === 0) {
+    targetDates.push(startDate);
+  }
+
+  // 2. Sheet 1: 나이스 RPA 자동 입력용 정규화 DB
+  const rpaRows = [];
+  rpaRows.push(['일자', '학번', '교시', '출결구분', '상태분류', '시스템등록일시']);
+
+  // 학생별 이상 출결 누적 통계 (Sheet 2용: 각 차시별 카운트가 아닌 '발생 날짜(일수)' 단위로 집계!)
+  const studentAnomalyStats = {};
+  appState.students.forEach(s => {
+    studentAnomalyStats[s.id] = {
+      id: s.id,
+      number: s.number,
+      absentDates: new Set(),
+      tardyDates: new Set(),
+      earlyDates: new Set(),
+      skipDates: new Set(),
+      anomalyDates: new Set(),
+      daySummaries: []
+    };
+  });
+
+  let anomalyCount = 0;
+
+  targetDates.forEach((recordDate) => {
     const dayPeriods = getPeriodsForDate(recordDate);
     appState.students.forEach((student) => {
       const records = getStudentAttendance(student.id, recordDate);
+      const dayAnomalies = [];
+
       dayPeriods.forEach((period) => {
         const status = records[period] || '출석';
-        const isAnomaly = status !== '출석' ? '결석·지각·조퇴·결과' : '정상출석';
+        const category = getStatusCategory(status);
+        const isAnomaly = (status !== '출석');
+
+        if (isAnomaly) {
+          anomalyCount++;
+          dayAnomalies.push({ period, status, category });
+        }
+
+        // [정상 출석 제외] 옵션이 켜져 있으면 일반 '출석'은 RPA 시트에서 과감히 제외!
+        if (onlyAnomalies && !isAnomaly) {
+          return;
+        }
+
+        const categoryLabel = {
+          'absent': '결석류',
+          'tardy': '지각류',
+          'early': '조퇴류',
+          'class-skip': '결과류',
+          'present': '정상출석'
+        }[category] || '정상출석';
+
         rpaRows.push([
           recordDate,
           student.number,
           period,
           status,
-          isAnomaly,
+          categoryLabel,
           nowIso
         ]);
       });
+
+      // 학생별 요약(Sheet 2): 각 차시를 다 가져오지 않고 해당 일자(하루 단위)로 분석 집계
+      if (dayAnomalies.length > 0) {
+        const stat = studentAnomalyStats[student.id];
+        if (stat) {
+          stat.anomalyDates.add(recordDate);
+
+          const hasAbsent = dayAnomalies.some(a => a.category === 'absent');
+          const hasTardy = dayAnomalies.some(a => a.category === 'tardy');
+          const hasEarly = dayAnomalies.some(a => a.category === 'early');
+          const hasSkip = dayAnomalies.some(a => a.category === 'class-skip');
+
+          if (hasAbsent) stat.absentDates.add(recordDate);
+          if (hasTardy) stat.tardyDates.add(recordDate);
+          if (hasEarly) stat.earlyDates.add(recordDate);
+          if (hasSkip) stat.skipDates.add(recordDate);
+
+          // 날짜별 깔끔한 요약 텍스트 생성 (차시 중복 나열 방지)
+          const parts = [];
+          if (hasAbsent) {
+            const absentItem = dayAnomalies.find(a => a.category === 'absent');
+            const absentName = absentItem ? absentItem.status : '결석';
+            const absentPeriods = dayAnomalies.filter(a => a.category === 'absent');
+            if (absentPeriods.length === dayPeriods.length) {
+              parts.push(`${absentName}(종일)`);
+            } else {
+              const pNames = absentPeriods.map(a => a.period).join(',');
+              parts.push(`${absentName}(${pNames})`);
+            }
+          }
+          if (hasTardy) {
+            const tardyItem = dayAnomalies.find(a => a.category === 'tardy');
+            parts.push(tardyItem ? tardyItem.status : '지각');
+          }
+          if (hasEarly) {
+            const earlyItem = dayAnomalies.find(a => a.category === 'early');
+            const earlyName = earlyItem ? earlyItem.status : '조퇴';
+            const firstEarlyPeriod = dayAnomalies.find(a => a.category === 'early').period;
+            parts.push(`${earlyName}(${firstEarlyPeriod}~)`);
+          }
+          if (hasSkip) {
+            const skipItems = dayAnomalies.filter(a => a.category === 'class-skip');
+            const skipName = skipItems[0].status;
+            const skipPeriods = skipItems.map(a => a.period).join(',');
+            parts.push(`${skipName}(${skipPeriods})`);
+          }
+
+          stat.daySummaries.push(`${recordDate}: ${parts.join(' / ')}`);
+        }
+      }
     });
   });
 
-  // 2. Sheet 2: 매트릭스 표 (현황 완전 제외! 순수 조례~마지막교시까지만!)
-  const matrixHeaders = ['학번', ...currentPeriods];
-  const matrixRows = [matrixHeaders];
+  // 만약 [정상 출석 제외] 옵션인데 이상 출결 건이 하나도 없다면 안내 행 삽입
+  if (onlyAnomalies && anomalyCount === 0) {
+    rpaRows.push([
+      `${startDate} ~ ${endDate}`,
+      '-',
+      '-',
+      '지정 기간 내 이상 출결 없음 (전원 정상 출석)',
+      '정상',
+      nowIso
+    ]);
+  }
 
-  appState.students.forEach((student) => {
-    const records = getStudentAttendance(student.id, date);
-    const row = [student.number];
-    currentPeriods.forEach(p => {
-      row.push(records[p] || '출석');
+  // 3. Sheet 2: 이상 출결 학생별 일수(날짜) 누적 요약 (또는 전체 출결 매트릭스)
+  let sheet2Name = '이상출결_학생별요약';
+  let sheet2Rows = [];
+
+  if (onlyAnomalies) {
+    sheet2Rows.push([
+      '학번',
+      '결석 (일)',
+      '지각 (일)',
+      '조퇴 (일)',
+      '결과 (일)',
+      '총 이상출결 (일)',
+      '이상 출결 일자별 요약'
+    ]);
+    const anomalyStudents = Object.values(studentAnomalyStats).filter(s => s.anomalyDates.size > 0);
+    if (anomalyStudents.length > 0) {
+      anomalyStudents.forEach(st => {
+        sheet2Rows.push([
+          st.number,
+          st.absentDates.size,
+          st.tardyDates.size,
+          st.earlyDates.size,
+          st.skipDates.size,
+          st.anomalyDates.size,
+          st.daySummaries.join(' | ')
+        ]);
+      });
+    } else {
+      sheet2Rows.push(['전원 정상', 0, 0, 0, 0, 0, '지정 기간 동안 모든 학생이 전 교시 정상 출석하였습니다.']);
+    }
+  } else {
+    sheet2Name = '출결_교시매트릭스';
+    const matrixDate = targetDates.includes(appState.selectedDate) ? appState.selectedDate : targetDates[targetDates.length - 1];
+    const currentPeriods = getPeriodsForDate(matrixDate);
+    const matrixHeaders = ['학번', ...currentPeriods];
+    sheet2Rows.push(matrixHeaders);
+
+    appState.students.forEach((student) => {
+      const records = getStudentAttendance(student.id, matrixDate);
+      const row = [student.number];
+      currentPeriods.forEach(p => {
+        row.push(records[p] || '출석');
+      });
+      sheet2Rows.push(row);
     });
-    matrixRows.push(row);
-  });
+  }
 
-  // 3. Sheet 3: 좌석 및 청소 역할 배정 현황 (소속 모둠 포함)
+  // 4. Sheet 3: 현재 좌석 및 청소 역할 배정 현황 (소속 모둠 포함)
   const seatCleaningRows = [];
   seatCleaningRows.push(['좌석 번호', '학번', '소속 모둠', '청소 담당 구역', '좌석 상태']);
   appState.seats.forEach((studentId, seatIdx) => {
@@ -1660,33 +2029,46 @@ function exportAttendanceToExcel() {
     seatCleaningRows.push([seatIdx + 1, studentId || '-', assignedGroupName, assignedRoleName, seatStatusText]);
   });
 
+  const fileTypeLabel = onlyAnomalies ? '이상출결' : '출결기록';
+  const fileName = `스마트학급_${fileTypeLabel}_${startDate}_${endDate}.xlsx`;
+
   if (typeof XLSX !== 'undefined') {
     try {
       const wb = XLSX.utils.book_new();
 
       const wsRpa = XLSX.utils.aoa_to_sheet(rpaRows);
-      wsRpa['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 18 }, { wch: 22 }];
+      wsRpa['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 22 }];
       XLSX.utils.book_append_sheet(wb, wsRpa, 'NEIS_RPA_출결DB');
 
-      const wsMatrix = XLSX.utils.aoa_to_sheet(matrixRows);
-      wsMatrix['!cols'] = matrixHeaders.map(() => ({ wch: 9 }));
-      XLSX.utils.book_append_sheet(wb, wsMatrix, '출결_교시매트릭스');
+      const wsSummary = XLSX.utils.aoa_to_sheet(sheet2Rows);
+      if (onlyAnomalies) {
+        wsSummary['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 45 }];
+      } else {
+        wsSummary['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
+      }
+      XLSX.utils.book_append_sheet(wb, wsSummary, sheet2Name);
 
       const wsSeats = XLSX.utils.aoa_to_sheet(seatCleaningRows);
       wsSeats['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 24 }, { wch: 12 }];
       XLSX.utils.book_append_sheet(wb, wsSeats, '좌석및청소배정');
 
-      const fileName = `스마트학급_출결기록_${date}.xlsx`;
       XLSX.writeFile(wb, fileName);
-      showToast(`나이스(NEIS) RPA용 엑셀이 다운로드되었습니다. (${fileName})`, 'success');
+      const msg = onlyAnomalies
+        ? `나이스(NEIS) RPA용 엑셀 다운로드 완료! (${startDate} ~ ${endDate}, 이상 출결 건만 추출: 총 ${anomalyCount}건)`
+        : `출결 엑셀 다운로드 완료! (${startDate} ~ ${endDate}, 전체 기록)`;
+      showToast(msg, 'success');
       return;
     } catch (e) {
       console.error('SheetJS 에러:', e);
     }
   }
 
-  downloadCsvFallback(rpaRows, `스마트학급_출결DB_${date}.csv`);
+  downloadCsvFallback(rpaRows, `스마트학급_${fileTypeLabel}_${startDate}_${endDate}.csv`);
   showToast('오프라인 모드: CSV 파일로 다운로드되었습니다.', 'success');
+}
+
+function exportAttendanceToExcel() {
+  openExcelExportModal();
 }
 
 function downloadCsvFallback(rows, filename) {
@@ -1940,6 +2322,7 @@ function setupEventListeners() {
     seatPeriodFilter.addEventListener('change', (e) => {
       appState.seatPeriodFilter = e.target.value;
       saveStateImmediately();
+      updateLivePeriodBadge();
       renderSeats();
     });
   }
@@ -2041,7 +2424,77 @@ function setupEventListeners() {
 
   const btnExportExcel = document.getElementById('btnExportExcel');
   if (btnExportExcel) {
-    btnExportExcel.addEventListener('click', exportAttendanceToExcel);
+    btnExportExcel.addEventListener('click', openExcelExportModal);
+  }
+
+  // 엑셀 내보내기 기간 & 필터 설정 모달 이벤트 바인딩
+  const excelModal = document.getElementById('excelExportModal');
+  const btnCancelExcelModal = document.getElementById('btnCancelExcelModal');
+  const btnConfirmExportExcel = document.getElementById('btnConfirmExportExcel');
+  const excelStartDateInput = document.getElementById('excelStartDate');
+  const excelEndDateInput = document.getElementById('excelEndDate');
+  const excelOnlyAnomaliesCheck = document.getElementById('excelOnlyAnomalies');
+
+  if (btnCancelExcelModal && excelModal) {
+    btnCancelExcelModal.addEventListener('click', () => {
+      excelModal.classList.add('hidden');
+    });
+  }
+
+  if (excelModal) {
+    excelModal.querySelectorAll('.btn-quick-range').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const rangeType = e.target.dataset.range;
+        const today = getTodayString();
+        const now = new Date(today + 'T00:00:00');
+
+        if (rangeType === 'today') {
+          excelStartDateInput.value = today;
+          excelEndDateInput.value = today;
+        } else if (rangeType === 'thisWeek') {
+          const day = now.getDay();
+          const diffToMonday = day === 0 ? -6 : 1 - day;
+          const monday = new Date(now);
+          monday.setDate(now.getDate() + diffToMonday);
+          excelStartDateInput.value = formatDateToYmd(monday);
+          excelEndDateInput.value = today;
+        } else if (rangeType === 'thisMonth') {
+          const y = now.getFullYear();
+          const m = String(now.getMonth() + 1).padStart(2, '0');
+          excelStartDateInput.value = `${y}-${m}-01`;
+          excelEndDateInput.value = today;
+        } else if (rangeType === 'all') {
+          const allDates = Object.keys(appState.attendanceRecords).filter(k => /^\d{4}-\d{2}-\d{2}$/.test(k)).sort();
+          if (allDates.length > 0) {
+            excelStartDateInput.value = allDates[0];
+            excelEndDateInput.value = allDates[allDates.length - 1] > today ? allDates[allDates.length - 1] : today;
+          } else {
+            excelStartDateInput.value = today;
+            excelEndDateInput.value = today;
+          }
+        }
+      });
+    });
+  }
+
+  if (btnConfirmExportExcel && excelModal) {
+    btnConfirmExportExcel.addEventListener('click', () => {
+      const startDate = excelStartDateInput ? excelStartDateInput.value : getTodayString();
+      const endDate = excelEndDateInput ? excelEndDateInput.value : getTodayString();
+      const onlyAnomalies = excelOnlyAnomaliesCheck ? excelOnlyAnomaliesCheck.checked : true;
+
+      if (!startDate || !endDate) {
+        alert('시작일과 종료일을 모두 선택해 주세요.');
+        return;
+      }
+      if (startDate > endDate) {
+        alert('시작일은 종료일보다 앞서거나 같아야 합니다.');
+        return;
+      }
+
+      excelModal.classList.add('hidden');
+      executeExcelExport(startDate, endDate, onlyAnomalies);
+    });
   }
 
   // 새 학년도 전체 초기화 (1년 주기 담임 교체용)
@@ -2095,6 +2548,8 @@ function setupEventListeners() {
   setInterval(updateLiveClock, 1000);
 }
 
+let lastLivePeriodSignature = '';
+
 function updateLiveClock() {
   const clockEl = document.getElementById('liveClock');
   if (!clockEl) return;
@@ -2103,6 +2558,19 @@ function updateLiveClock() {
   const dayStr = days[now.getDay()];
   const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
   clockEl.textContent = `(${dayStr}) ${timeStr}`;
+
+  // 실시간 교시 뱃지 갱신
+  updateLivePeriodBadge();
+
+  // 매 분 정각(0초) 또는 교시 변경 시 실시간 좌석 출결 자동 동기화
+  if (appState.seatPeriodFilter === 'auto' && appState.selectedDate === getTodayString()) {
+    const liveInfo = getCurrentLivePeriodInfo(appState.selectedDate);
+    const signature = `${liveInfo.period}_${liveInfo.isAfterSchool}`;
+    if (signature !== lastLivePeriodSignature || now.getSeconds() === 0) {
+      lastLivePeriodSignature = signature;
+      renderSeats();
+    }
+  }
 }
 
 function showToast(message, type = 'info') {

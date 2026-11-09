@@ -242,6 +242,10 @@
                 </svg>
                 좌석 배치도 <span class="perspective-tag">(우측하단 1번 ➔ 좌측)</span>
               </h2>
+              <span id="livePeriodBadge" class="badge-live-period" title="시간표 기준 현재 진행 교시 자동 반영">
+                <span class="live-dot"></span>
+                <span id="livePeriodText">실시간 동기화</span>
+              </span>
             </div>
 
             <!-- 좌석 배치 설정 (가로/세로 지정, 모둠 수 지정 & 출결 기준) -->
@@ -454,6 +458,91 @@
         <div class="modal-footer">
           <button id="btnCancelYearlyReset" class="btn btn-secondary">취소</button>
           <button id="btnConfirmYearlyReset" class="btn btn-danger-confirm" disabled>전체 초기화 실행</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모달: 나이스 RPA 엑셀 추출 기간 및 필터 설정 대화상자 -->
+    <div id="excelExportModal" class="modal-backdrop hidden">
+      <div class="modal-card modal-card-excel">
+        <div class="modal-header">
+          <div class="modal-icon-wrap excel">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+          </div>
+          <div>
+            <h3>나이스(NEIS) RPA 엑셀 다운로드</h3>
+            <p class="modal-subtitle">기간을 설정하고 나이스 입력용 이상 출결(결석·지각·조퇴·결과) 건만 깔끔하게 추출합니다.</p>
+          </div>
+        </div>
+        <div class="modal-body">
+          <!-- 기간 설정 -->
+          <div class="form-group">
+            <label class="form-section-title">📅 추출 기간 설정</label>
+            <div class="date-range-inputs">
+              <div class="date-range-field">
+                <span class="range-sublabel">시작일</span>
+                <input type="date" id="excelStartDate" class="form-input">
+              </div>
+              <span class="range-separator">~</span>
+              <div class="date-range-field">
+                <span class="range-sublabel">종료일</span>
+                <input type="date" id="excelEndDate" class="form-input">
+              </div>
+            </div>
+            <!-- 빠른 기간 선택 버튼 -->
+            <div class="quick-range-btns">
+              <button type="button" class="btn-quick-range" data-range="today">오늘만</button>
+              <button type="button" class="btn-quick-range" data-range="thisWeek">이번 주</button>
+              <button type="button" class="btn-quick-range" data-range="thisMonth">이번 달</button>
+              <button type="button" class="btn-quick-range" data-range="all">전체 누적</button>
+            </div>
+          </div>
+
+          <!-- 필터 옵션: 정상 출석 제외 -->
+          <div class="form-group" style="margin-top: 14px;">
+            <label class="form-section-title">⚙️ 출결 데이터 필터</label>
+            <label class="checkbox-container" for="excelOnlyAnomalies">
+              <input type="checkbox" id="excelOnlyAnomalies" checked>
+              <span class="checkmark"></span>
+              <span class="checkbox-label-wrap">
+                <strong class="checkbox-title">정상 출석 제외 (결석·지각·조퇴·결과 이벤트만 추출)</strong>
+                <span class="checkbox-desc">수백~수천 줄의 일반 '출석'을 제외하고, 나이스 RPA 등록에 필요한 이상 출결 건만 정규화 DB로 추출합니다. (체크 해제 시 전체 출석 데이터 포함)</span>
+              </span>
+            </label>
+          </div>
+
+          <!-- 시트 구성 미리보기 안내 -->
+          <div class="excel-preview-info">
+            <div class="preview-item">
+              <span class="preview-badge">Sheet 1</span>
+              <span><strong>NEIS_RPA_출결DB</strong>: 나이스 자동 등록용 정규화 데이터 (일자, 학번, 교시, 구분)</span>
+            </div>
+            <div class="preview-item">
+              <span class="preview-badge">Sheet 2</span>
+              <span><strong>이상출결_학생별요약</strong>: 기간 내 결석/지각/조퇴/결과 누적 일수(날짜 단위) 및 일자별 요약</span>
+            </div>
+            <div class="preview-item">
+              <span class="preview-badge">Sheet 3</span>
+              <span><strong>학급배정현황</strong>: 현재 좌석 및 청소 역할 배정 현황</span>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button id="btnCancelExcelModal" class="btn btn-secondary">취소</button>
+          <button id="btnConfirmExportExcel" class="btn btn-excel-confirm">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>엑셀 다운로드 실행</span>
+          </button>
         </div>
       </div>
     </div>

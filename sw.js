@@ -1,4 +1,4 @@
-const CACHE_NAME = 'smart-class-pwa-v10';
+const CACHE_NAME = 'smart-class-pwa-v12';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

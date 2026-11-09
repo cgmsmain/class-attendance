@@ -1510,6 +1510,31 @@ body {
 }
 .modal-icon-wrap.danger svg { width: 18px; height: 18px; }
 
+.modal-icon-wrap.excel {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(52, 211, 153, 0.18);
+  color: #34d399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.modal-icon-wrap.excel svg { width: 20px; height: 20px; }
+
+.modal-card-excel {
+  max-width: 480px;
+  width: 92%;
+}
+
+.modal-subtitle {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
 .reset-warning-desc {
   font-size: 0.82rem;
   color: #f1f5f9;
@@ -1674,3 +1699,194 @@ body {
 
 @keyframes slideInRight { to { transform: translateX(0); } }
 @keyframes fadeOutRight { to { transform: translateX(120%); opacity: 0; } }
+
+/* ==========================================================================
+   실시간 교시 뱃지 & 엑셀 모달 상세 스타일
+   ========================================================================== */
+.badge-live-period {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  color: #38bdf8;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
+.live-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  box-shadow: 0 0 6px #38bdf8;
+  animation: pulseLiveDot 1.6s infinite ease-in-out;
+}
+
+@keyframes pulseLiveDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+/* 엑셀 모달 전용 폼 스타일 */
+.form-section-title {
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #e2e8f0;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg-main);
+  padding: 8px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.date-range-field {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.range-sublabel {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  font-weight: 700;
+}
+
+.range-separator {
+  color: var(--text-dim);
+  font-weight: 800;
+  font-size: 0.9rem;
+}
+
+.quick-range-btns {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.btn-quick-range {
+  flex: 1;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 4px;
+  color: var(--text-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 0;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.btn-quick-range:hover {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.4);
+  color: #38bdf8;
+}
+
+/* 체크박스 커스텀 스타일 */
+.checkbox-container {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: rgba(16, 20, 30, 0.7);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.checkbox-container:hover {
+  border-color: rgba(52, 211, 153, 0.6);
+  background: rgba(16, 20, 30, 0.9);
+}
+
+.checkbox-container input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  cursor: pointer;
+  accent-color: var(--color-present);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.checkbox-label-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.checkbox-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #f1f5f9;
+}
+
+.checkbox-desc {
+  font-size: 0.68rem;
+  color: var(--text-dim);
+  line-height: 1.35;
+}
+
+/* 엑셀 시트 미리보기 설명 박스 */
+.excel-preview-info {
+  margin-top: 12px;
+  background: var(--bg-main);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.preview-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 0.72rem;
+  color: #cbd5e1;
+  line-height: 1.35;
+}
+
+.preview-badge {
+  background: rgba(148, 163, 184, 0.15);
+  color: #94a3b8;
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.btn-excel-confirm {
+  background: #059669;
+  color: #ffffff;
+  font-weight: 800;
+  border: 1px solid #10b981;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  transition: all 0.15s ease;
+}
+.btn-excel-confirm:hover {
+  background: #10b981;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+

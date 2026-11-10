@@ -17,10 +17,10 @@
 // ============================================================================
 const STORAGE_KEY = 'SMART_CLASSROOM_PWA_STATE_V6';
 
-// 출결 옵션: 출석 + 결석류 + 지각류 + 조퇴류 + 결과류(신규)
+// 출결 옵션: 출석 + 결석류(인정결석/병결석/미인정결석) + 지각류 + 조퇴류 + 결과류
 const ATTENDANCE_OPTIONS = [
   '출석',
-  '인정결', '병결', '미인정결',       // 결석류
+  '인정결석', '병결석', '미인정결석',   // 결석류 (인정결/병결/미인정결 -> 인정결석/병결석/미인정결석)
   '인정지각', '병지각', '미인정지각',   // 지각류
   '인정조퇴', '병조퇴', '미인정조퇴',   // 조퇴류
   '인정결과', '병결과', '미인정결과'    // 결과류
@@ -544,6 +544,17 @@ function updateRoleTargetCount(roleId, delta) {
 // ============================================================================
 // 7. 출결 헬퍼 함수 & 분류 (결과류 포함)
 // ============================================================================
+/**
+ * 구버전 명칭('인정결', '병결', '미인정결')을 신규 표준('인정결석', '병결석', '미인정결석')으로 정규화
+ */
+function normalizeAttendanceStatus(statusStr) {
+  if (!statusStr) return '출석';
+  if (statusStr === '인정결') return '인정결석';
+  if (statusStr === '병결') return '병결석';
+  if (statusStr === '미인정결') return '미인정결석';
+  return statusStr;
+}
+
 function getStudentAttendance(studentId, date = appState.selectedDate) {
   if (!appState.attendanceRecords[date]) {
     appState.attendanceRecords[date] = {};
@@ -554,12 +565,18 @@ function getStudentAttendance(studentId, date = appState.selectedDate) {
     periods.forEach(p => { defaultPeriodObj[p] = '출석'; });
     appState.attendanceRecords[date][studentId] = defaultPeriodObj;
   }
-  return appState.attendanceRecords[date][studentId];
+  
+  // 구버전 출결 명칭 자동 마이그레이션
+  const rec = appState.attendanceRecords[date][studentId];
+  for (const p in rec) {
+    rec[p] = normalizeAttendanceStatus(rec[p]);
+  }
+  return rec;
 }
 
 function setStudentAttendance(studentId, period, status, date = appState.selectedDate) {
   const record = getStudentAttendance(studentId, date);
-  record[period] = status;
+  record[period] = normalizeAttendanceStatus(status);
 }
 
 /**
@@ -826,7 +843,7 @@ function bindTableEvents() {
       e.target.dataset.type = category;
       setStudentAttendance(studentId, changedPeriod, newStatus);
 
-      // 2) [핵심 기능] 결석류 또는 조퇴류인 경우 이후 교시들 자동 일괄 적용!
+      // 2) [핵심 기능 1] 결석류 또는 조퇴류인 경우 이후 교시들 자동 일괄 적용!
       if (category === 'absent' || category === 'early') {
         const periods = getPeriodsForDate(appState.selectedDate);
         const currIdx = periods.indexOf(changedPeriod);
@@ -847,6 +864,29 @@ function bindTableEvents() {
             }
           }
           showToast(`${studentId}번: ${changedPeriod} [${newStatus}] 지정으로 이후 교시가 자동 적용되었습니다.`, 'info');
+        }
+      }
+      // 2-2) [핵심 기능 2] 지각류인 경우 그 앞의 모든 이전 교시들 자동 일괄 적용! (예: 3교시 지각 -> 조례,1,2교시도 지각)
+      else if (category === 'tardy') {
+        const periods = getPeriodsForDate(appState.selectedDate);
+        const currIdx = periods.indexOf(changedPeriod);
+
+        if (currIdx > 0) {
+          for (let i = 0; i < currIdx; i++) {
+            const prevPeriod = periods[i];
+            setStudentAttendance(studentId, prevPeriod, newStatus);
+
+            // 해당 행의 이전 셀렉트박스 DOM도 즉시 동기화
+            const prevSelect = tbody.querySelector(
+              `select.select-attendance[data-student-id="${studentId}"][data-period="${prevPeriod}"]`
+            );
+            if (prevSelect) {
+              prevSelect.value = newStatus;
+              prevSelect.dataset.status = newStatus;
+              prevSelect.dataset.type = category;
+            }
+          }
+          showToast(`${studentId}번: ${changedPeriod} [${newStatus}] 지정으로 앞선 교시들이 자동 적용되었습니다.`, 'info');
         }
       }
 
@@ -1803,7 +1843,99 @@ function formatDateToYmd(dateObj) {
 }
 
 /**
- * 나이스 RPA 엑셀 생성 및 다운로드 실행
+ * 특정 학생의 특정 일자(recordDate) 출결을 '담임확인서' 형식의 1줄 단위 이벤트들로 집계
+ * - 5교시 병조퇴 -> 5,6,7교시 각각이 아닌 "5교시부터" 단 1줄 생성!
+ * - 3교시 인정지각 -> 조례,1,2,3교시 각각이 아닌 "3교시까지" 단 1줄 생성!
+ * - 결석류 -> 하루 전체 결석이므로 교시 공란으로 단 1줄 생성!
+ * - 결과류 -> "3교시" 등 해당 교시 단 1줄 생성!
+ */
+function aggregateStudentDayConfirmationEvents(student, recordDate) {
+  const dayPeriods = getPeriodsForDate(recordDate);
+  const records = getStudentAttendance(student.id, recordDate);
+
+  const anomalies = [];
+  dayPeriods.forEach(p => {
+    const rawStatus = records[p] || '출석';
+    const status = normalizeAttendanceStatus(rawStatus);
+    if (status !== '출석') {
+      anomalies.push({ period: p, status, category: getStatusCategory(status) });
+    }
+  });
+
+  if (anomalies.length === 0) {
+    return [];
+  }
+
+  const events = [];
+
+  // 1. 결석류 확인 (인정결석, 병결석, 미인정결석)
+  const absentItems = anomalies.filter(a => a.category === 'absent');
+  if (absentItems.length > 0) {
+    const repStatus = absentItems[0].status;
+    events.push({
+      date: recordDate,
+      number: student.number,
+      name: '',
+      attendance: repStatus,
+      reason: '',
+      period: '', // 결석은 교시 공란
+      remarks: ''
+    });
+    // 결석인 날은 하루 전체 결석이므로 바로 리턴
+    return events;
+  }
+
+  // 2. 지각류 확인 (인정지각, 병지각, 미인정지각)
+  const tardyItems = anomalies.filter(a => a.category === 'tardy');
+  if (tardyItems.length > 0) {
+    // 마지막 체크된 지각 교시 찾기 (예: 3교시 -> '3교시까지')
+    const lastTardy = tardyItems[tardyItems.length - 1];
+    events.push({
+      date: recordDate,
+      number: student.number,
+      name: '',
+      attendance: lastTardy.status,
+      reason: '',
+      period: `${lastTardy.period}까지`, // '3교시까지' 한 줄 요약!
+      remarks: ''
+    });
+  }
+
+  // 3. 조퇴류 확인 (인정조퇴, 병조퇴, 미인정조퇴)
+  const earlyItems = anomalies.filter(a => a.category === 'early');
+  if (earlyItems.length > 0) {
+    // 조퇴가 시작된 첫 교시 찾기 (예: '5교시')
+    const firstEarly = earlyItems[0];
+    events.push({
+      date: recordDate,
+      number: student.number,
+      name: '',
+      attendance: firstEarly.status,
+      reason: '',
+      period: `${firstEarly.period}부터`, // '5교시부터' 한 줄 요약!
+      remarks: ''
+    });
+  }
+
+  // 4. 결과류 확인 (인정결과, 병결과, 미인정결과)
+  const skipItems = anomalies.filter(a => a.category === 'class-skip');
+  skipItems.forEach(item => {
+    events.push({
+      date: recordDate,
+      number: student.number,
+      name: '',
+      attendance: item.status,
+      reason: '',
+      period: `${item.period}`, // '2교시', '3교시' 등
+      remarks: ''
+    });
+  });
+
+  return events;
+}
+
+/**
+ * 담임확인서 양식 엑셀 생성 및 다운로드 실행
  * @param {string} startDate - 시작일 (YYYY-MM-DD)
  * @param {string} endDate - 종료일 (YYYY-MM-DD)
  * @param {boolean} onlyAnomalies - true이면 결석/지각/조퇴/결과 이상 출결 건만 추출, false이면 정상 출석 포함
@@ -1819,7 +1951,6 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
   for (let dt = new Date(startObj); dt <= endObj; dt.setDate(dt.getDate() + 1)) {
     const dayOfWeek = dt.getDay();
     const dStr = formatDateToYmd(dt);
-    // 주말(일=0, 토=6)은 기본 제외하되, 주말에 출결 데이터가 있는 경우엔 포함
     if (dayOfWeek !== 0 && dayOfWeek !== 6) {
       targetDates.push(dStr);
     } else if (appState.attendanceRecords[dStr]) {
@@ -1831,9 +1962,9 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
     targetDates.push(startDate);
   }
 
-  // 2. Sheet 1: 나이스 RPA 자동 입력용 정규화 DB
-  const rpaRows = [];
-  rpaRows.push(['일자', '학번', '교시', '출결구분', '상태분류', '시스템등록일시']);
+  // 2. Sheet 1: [출결 확인서] (담임확인서.xlsm 양식: 날짜 | 번호 | 이름 | 출결 | 사유 | 교시 | 비고)
+  const confirmationRows = [];
+  confirmationRows.push(['날짜', '번호', '이름', '출결', '사유', '교시', '비고']);
 
   // 학생별 이상 출결 누적 통계 (Sheet 2용: 각 차시별 카운트가 아닌 '발생 날짜(일수)' 단위로 집계!)
   const studentAnomalyStats = {};
@@ -1850,159 +1981,118 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
     };
   });
 
-  let anomalyCount = 0;
+  let totalConfirmationCount = 0;
 
   targetDates.forEach((recordDate) => {
-    const dayPeriods = getPeriodsForDate(recordDate);
     appState.students.forEach((student) => {
-      const records = getStudentAttendance(student.id, recordDate);
-      const dayAnomalies = [];
+      const dayEvents = aggregateStudentDayConfirmationEvents(student, recordDate);
 
-      dayPeriods.forEach((period) => {
-        const status = records[period] || '출석';
-        const category = getStatusCategory(status);
-        const isAnomaly = (status !== '출석');
+      if (dayEvents.length > 0) {
+        dayEvents.forEach(ev => {
+          totalConfirmationCount++;
+          confirmationRows.push([
+            ev.date,
+            ev.number,
+            ev.name,
+            ev.attendance,
+            ev.reason,
+            ev.period,
+            ev.remarks
+          ]);
+        });
 
-        if (isAnomaly) {
-          anomalyCount++;
-          dayAnomalies.push({ period, status, category });
-        }
-
-        // [정상 출석 제외] 옵션이 켜져 있으면 일반 '출석'은 RPA 시트에서 과감히 제외!
-        if (onlyAnomalies && !isAnomaly) {
-          return;
-        }
-
-        const categoryLabel = {
-          'absent': '결석류',
-          'tardy': '지각류',
-          'early': '조퇴류',
-          'class-skip': '결과류',
-          'present': '정상출석'
-        }[category] || '정상출석';
-
-        rpaRows.push([
-          recordDate,
-          student.number,
-          period,
-          status,
-          categoryLabel,
-          nowIso
-        ]);
-      });
-
-      // 학생별 요약(Sheet 2): 각 차시를 다 가져오지 않고 해당 일자(하루 단위)로 분석 집계
-      if (dayAnomalies.length > 0) {
+        // 학생별 요약(Sheet 2) 통계 갱신
         const stat = studentAnomalyStats[student.id];
         if (stat) {
           stat.anomalyDates.add(recordDate);
-
-          const hasAbsent = dayAnomalies.some(a => a.category === 'absent');
-          const hasTardy = dayAnomalies.some(a => a.category === 'tardy');
-          const hasEarly = dayAnomalies.some(a => a.category === 'early');
-          const hasSkip = dayAnomalies.some(a => a.category === 'class-skip');
-
-          if (hasAbsent) stat.absentDates.add(recordDate);
-          if (hasTardy) stat.tardyDates.add(recordDate);
-          if (hasEarly) stat.earlyDates.add(recordDate);
-          if (hasSkip) stat.skipDates.add(recordDate);
-
-          // 날짜별 깔끔한 요약 텍스트 생성 (차시 중복 나열 방지)
-          const parts = [];
-          if (hasAbsent) {
-            const absentItem = dayAnomalies.find(a => a.category === 'absent');
-            const absentName = absentItem ? absentItem.status : '결석';
-            const absentPeriods = dayAnomalies.filter(a => a.category === 'absent');
-            if (absentPeriods.length === dayPeriods.length) {
-              parts.push(`${absentName}(종일)`);
-            } else {
-              const pNames = absentPeriods.map(a => a.period).join(',');
-              parts.push(`${absentName}(${pNames})`);
-            }
-          }
-          if (hasTardy) {
-            const tardyItem = dayAnomalies.find(a => a.category === 'tardy');
-            parts.push(tardyItem ? tardyItem.status : '지각');
-          }
-          if (hasEarly) {
-            const earlyItem = dayAnomalies.find(a => a.category === 'early');
-            const earlyName = earlyItem ? earlyItem.status : '조퇴';
-            const firstEarlyPeriod = dayAnomalies.find(a => a.category === 'early').period;
-            parts.push(`${earlyName}(${firstEarlyPeriod}~)`);
-          }
-          if (hasSkip) {
-            const skipItems = dayAnomalies.filter(a => a.category === 'class-skip');
-            const skipName = skipItems[0].status;
-            const skipPeriods = skipItems.map(a => a.period).join(',');
-            parts.push(`${skipName}(${skipPeriods})`);
-          }
-
-          stat.daySummaries.push(`${recordDate}: ${parts.join(' / ')}`);
+          dayEvents.forEach(ev => {
+            const cat = getStatusCategory(ev.attendance);
+            if (cat === 'absent') stat.absentDates.add(recordDate);
+            else if (cat === 'tardy') stat.tardyDates.add(recordDate);
+            else if (cat === 'early') stat.earlyDates.add(recordDate);
+            else if (cat === 'class-skip') stat.skipDates.add(recordDate);
+          });
+          const summaryStr = dayEvents.map(e => e.period ? `${e.attendance}(${e.period})` : `${e.attendance}`).join(' / ');
+          stat.daySummaries.push(`${recordDate}: ${summaryStr}`);
         }
+      } else if (!onlyAnomalies) {
+        // [정상 출석 제외] 체크 해제 시
+        confirmationRows.push([
+          recordDate,
+          student.number,
+          '',
+          '출석',
+          '',
+          '',
+          ''
+        ]);
       }
     });
   });
 
   // 만약 [정상 출석 제외] 옵션인데 이상 출결 건이 하나도 없다면 안내 행 삽입
-  if (onlyAnomalies && anomalyCount === 0) {
-    rpaRows.push([
+  if (onlyAnomalies && totalConfirmationCount === 0) {
+    confirmationRows.push([
       `${startDate} ~ ${endDate}`,
       '-',
-      '-',
+      '',
+      '정상출석',
       '지정 기간 내 이상 출결 없음 (전원 정상 출석)',
-      '정상',
-      nowIso
+      '',
+      ''
     ]);
   }
 
-  // 3. Sheet 2: 이상 출결 학생별 일수(날짜) 누적 요약 (또는 전체 출결 매트릭스)
-  let sheet2Name = '이상출결_학생별요약';
-  let sheet2Rows = [];
-
-  if (onlyAnomalies) {
-    sheet2Rows.push([
-      '학번',
-      '결석 (일)',
-      '지각 (일)',
-      '조퇴 (일)',
-      '결과 (일)',
-      '총 이상출결 (일)',
-      '이상 출결 일자별 요약'
-    ]);
-    const anomalyStudents = Object.values(studentAnomalyStats).filter(s => s.anomalyDates.size > 0);
-    if (anomalyStudents.length > 0) {
-      anomalyStudents.forEach(st => {
-        sheet2Rows.push([
-          st.number,
-          st.absentDates.size,
-          st.tardyDates.size,
-          st.earlyDates.size,
-          st.skipDates.size,
-          st.anomalyDates.size,
-          st.daySummaries.join(' | ')
-        ]);
-      });
-    } else {
-      sheet2Rows.push(['전원 정상', 0, 0, 0, 0, 0, '지정 기간 동안 모든 학생이 전 교시 정상 출석하였습니다.']);
-    }
-  } else {
-    sheet2Name = '출결_교시매트릭스';
-    const matrixDate = targetDates.includes(appState.selectedDate) ? appState.selectedDate : targetDates[targetDates.length - 1];
-    const currentPeriods = getPeriodsForDate(matrixDate);
-    const matrixHeaders = ['학번', ...currentPeriods];
-    sheet2Rows.push(matrixHeaders);
-
-    appState.students.forEach((student) => {
-      const records = getStudentAttendance(student.id, matrixDate);
-      const row = [student.number];
-      currentPeriods.forEach(p => {
-        row.push(records[p] || '출석');
-      });
-      sheet2Rows.push(row);
+  // 3. Sheet 2: 이상 출결 학생별 일수(날짜) 누적 요약
+  const sheet2Rows = [];
+  sheet2Rows.push([
+    '학번',
+    '결석 (일)',
+    '지각 (일)',
+    '조퇴 (일)',
+    '결과 (일)',
+    '총 이상출결 (일)',
+    '이상 출결 일자별 요약'
+  ]);
+  const anomalyStudents = Object.values(studentAnomalyStats).filter(s => s.anomalyDates.size > 0);
+  if (anomalyStudents.length > 0) {
+    anomalyStudents.forEach(st => {
+      sheet2Rows.push([
+        st.number,
+        st.absentDates.size,
+        st.tardyDates.size,
+        st.earlyDates.size,
+        st.skipDates.size,
+        st.anomalyDates.size,
+        st.daySummaries.join(' | ')
+      ]);
     });
+  } else {
+    sheet2Rows.push(['전원 정상', 0, 0, 0, 0, 0, '지정 기간 동안 모든 학생이 전 교시 정상 출석하였습니다.']);
   }
 
-  // 4. Sheet 3: 현재 좌석 및 청소 역할 배정 현황 (소속 모둠 포함)
+  // 4. Sheet 3: 참조목록 (담임확인서.xlsm Sheet3 기준)
+  const refRows = [
+    ['비고', '', '출결'],
+    ['생리통', '', '질병결석'],
+    ['현장체험학습', '', '미인정결석'],
+    ['대회출전', '', '기타결석'],
+    ['', '', '인정결석'],
+    ['', '', '질병지각'],
+    ['', '', '미인정지각'],
+    ['', '', '기타지각'],
+    ['', '', '인정지각'],
+    ['', '', '질병조퇴'],
+    ['', '', '미인정조퇴'],
+    ['', '', '기타조퇴'],
+    ['', '', '인정조퇴'],
+    ['', '', '질병결과'],
+    ['', '', '미인정결과'],
+    ['', '', '기타결과'],
+    ['', '', '인정결과']
+  ];
+
+  // 5. Sheet 4: 현재 좌석 및 청소 역할 배정 현황 (소속 모둠 포함)
   const seatCleaningRows = [];
   seatCleaningRows.push(['좌석 번호', '학번', '소속 모둠', '청소 담당 구역', '좌석 상태']);
   appState.seats.forEach((studentId, seatIdx) => {
@@ -2029,32 +2119,43 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
     seatCleaningRows.push([seatIdx + 1, studentId || '-', assignedGroupName, assignedRoleName, seatStatusText]);
   });
 
-  const fileTypeLabel = onlyAnomalies ? '이상출결' : '출결기록';
-  const fileName = `스마트학급_${fileTypeLabel}_${startDate}_${endDate}.xlsx`;
+  const fileName = `담임확인서_출결기록_${startDate}_${endDate}.xlsx`;
 
   if (typeof XLSX !== 'undefined') {
     try {
       const wb = XLSX.utils.book_new();
 
-      const wsRpa = XLSX.utils.aoa_to_sheet(rpaRows);
-      wsRpa['!cols'] = [{ wch: 12 }, { wch: 8 }, { wch: 8 }, { wch: 14 }, { wch: 14 }, { wch: 22 }];
-      XLSX.utils.book_append_sheet(wb, wsRpa, 'NEIS_RPA_출결DB');
+      // Sheet 1: 출결 확인서 (담임확인서 양식)
+      const wsConfirm = XLSX.utils.aoa_to_sheet(confirmationRows);
+      wsConfirm['!cols'] = [
+        { wch: 13 }, // A: 날짜
+        { wch: 7 },  // B: 번호
+        { wch: 9 },  // C: 이름
+        { wch: 12 }, // D: 출결
+        { wch: 14 }, // E: 사유
+        { wch: 12 }, // F: 교시
+        { wch: 14 }  // G: 비고
+      ];
+      XLSX.utils.book_append_sheet(wb, wsConfirm, '출결 확인서');
 
+      // Sheet 2: 이상출결_학생별요약
       const wsSummary = XLSX.utils.aoa_to_sheet(sheet2Rows);
-      if (onlyAnomalies) {
-        wsSummary['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 45 }];
-      } else {
-        wsSummary['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }];
-      }
-      XLSX.utils.book_append_sheet(wb, wsSummary, sheet2Name);
+      wsSummary['!cols'] = [{ wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 10 }, { wch: 14 }, { wch: 45 }];
+      XLSX.utils.book_append_sheet(wb, wsSummary, '이상출결_학생별요약');
 
+      // Sheet 3: Sheet3 (출결 및 비고 참조목록)
+      const wsRef = XLSX.utils.aoa_to_sheet(refRows);
+      wsRef['!cols'] = [{ wch: 14 }, { wch: 4 }, { wch: 14 }];
+      XLSX.utils.book_append_sheet(wb, wsRef, 'Sheet3');
+
+      // Sheet 4: 좌석및청소배정
       const wsSeats = XLSX.utils.aoa_to_sheet(seatCleaningRows);
       wsSeats['!cols'] = [{ wch: 10 }, { wch: 8 }, { wch: 14 }, { wch: 24 }, { wch: 12 }];
       XLSX.utils.book_append_sheet(wb, wsSeats, '좌석및청소배정');
 
       XLSX.writeFile(wb, fileName);
       const msg = onlyAnomalies
-        ? `나이스(NEIS) RPA용 엑셀 다운로드 완료! (${startDate} ~ ${endDate}, 이상 출결 건만 추출: 총 ${anomalyCount}건)`
+        ? `담임확인서 양식 엑셀 다운로드 완료! (${startDate} ~ ${endDate}, 총 ${totalConfirmationCount}건)`
         : `출결 엑셀 다운로드 완료! (${startDate} ~ ${endDate}, 전체 기록)`;
       showToast(msg, 'success');
       return;
@@ -2063,7 +2164,7 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
     }
   }
 
-  downloadCsvFallback(rpaRows, `스마트학급_${fileTypeLabel}_${startDate}_${endDate}.csv`);
+  downloadCsvFallback(confirmationRows, `담임확인서_출결기록_${startDate}_${endDate}.csv`);
   showToast('오프라인 모드: CSV 파일로 다운로드되었습니다.', 'success');
 }
 

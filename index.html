@@ -172,7 +172,7 @@
                 <span class="pill-label">출석</span>
                 <span id="sumPresentCount" class="pill-num">30</span>
               </div>
-              <div class="summary-pill pill-absent" title="결석 (인정/병/미인정)">
+              <div class="summary-pill pill-absent" title="결석 (인정결석/병결석/미인정결석)">
                 <span class="pill-dot"></span>
                 <span class="pill-label">결석</span>
                 <span id="sumAbsentCount" class="pill-num">0</span>
@@ -223,7 +223,7 @@
           <span class="hint-item"><span class="legend-box lg-early"></span>조퇴류</span>
           <span class="hint-item"><span class="legend-box lg-skip"></span>결과류</span>
           <span id="weekdayHintText" class="hint-item schedule-text">월·수·금 6교시 / 화·목 7교시</span>
-          <span class="hint-item auto-cascade-hint">💡 결석/조퇴 시 이후 교시 자동 적용</span>
+          <span class="hint-item auto-cascade-hint">💡 결석/조퇴: 이후 교시 자동 적용 | 지각: 앞선 교시 자동 적용</span>
         </div>
       </section>
 
@@ -476,8 +476,8 @@
             </svg>
           </div>
           <div>
-            <h3>나이스(NEIS) RPA 엑셀 다운로드</h3>
-            <p class="modal-subtitle">기간을 설정하고 나이스 입력용 이상 출결(결석·지각·조퇴·결과) 건만 깔끔하게 추출합니다.</p>
+            <h3>담임확인서 / 나이스 출결 엑셀 다운로드</h3>
+            <p class="modal-subtitle">기간을 설정하고 담임확인서 양식(날짜·번호·이름·출결·사유·교시·비고)으로 깔끔하게 다운로드합니다.</p>
           </div>
         </div>
         <div class="modal-body">
@@ -512,7 +512,7 @@
               <span class="checkmark"></span>
               <span class="checkbox-label-wrap">
                 <strong class="checkbox-title">정상 출석 제외 (결석·지각·조퇴·결과 이벤트만 추출)</strong>
-                <span class="checkbox-desc">수백~수천 줄의 일반 '출석'을 제외하고, 나이스 RPA 등록에 필요한 이상 출결 건만 정규화 DB로 추출합니다. (체크 해제 시 전체 출석 데이터 포함)</span>
+                <span class="checkbox-desc">수백~수천 줄의 일반 '출석'을 제외하고, 담임확인서 및 나이스에 필요한 특이사항만 콤팩트하게 추출합니다. (조퇴 시 '5교시부터', 지각 시 '3교시까지' 등 1줄로 자동 요약)</span>
               </span>
             </label>
           </div>
@@ -521,7 +521,7 @@
           <div class="excel-preview-info">
             <div class="preview-item">
               <span class="preview-badge">Sheet 1</span>
-              <span><strong>NEIS_RPA_출결DB</strong>: 나이스 자동 등록용 정규화 데이터 (일자, 학번, 교시, 구분)</span>
+              <span><strong>출결 확인서</strong>: 담임확인서 표준 양식 (날짜, 번호, 이름, 출결, 사유, 교시, 비고)</span>
             </div>
             <div class="preview-item">
               <span class="preview-badge">Sheet 2</span>
@@ -529,7 +529,11 @@
             </div>
             <div class="preview-item">
               <span class="preview-badge">Sheet 3</span>
-              <span><strong>학급배정현황</strong>: 현재 좌석 및 청소 역할 배정 현황</span>
+              <span><strong>Sheet3</strong>: 출결 구분 및 비고 참조 목록</span>
+            </div>
+            <div class="preview-item">
+              <span class="preview-badge">Sheet 4</span>
+              <span><strong>학급좌석및청소배정</strong>: 현재 좌석 및 청소 역할 배정 현황</span>
             </div>
           </div>
         </div>

@@ -17,13 +17,13 @@
 // ============================================================================
 const STORAGE_KEY = 'SMART_CLASSROOM_PWA_STATE_V6';
 
-// 출결 옵션: 출석 + 결석류(인정결석/병결석/미인정결석) + 지각류 + 조퇴류 + 결과류
+// 출결 옵션: 출석 + 결석류 + 지각류 + 조퇴류 + 결과류 (담임확인서 표준 띄어쓰기 준수)
 const ATTENDANCE_OPTIONS = [
   '출석',
-  '인정결석', '병결석', '미인정결석',   // 결석류 (인정결/병결/미인정결 -> 인정결석/병결석/미인정결석)
-  '인정지각', '병지각', '미인정지각',   // 지각류
-  '인정조퇴', '병조퇴', '미인정조퇴',   // 조퇴류
-  '인정결과', '병결과', '미인정결과'    // 결과류
+  '질병결석', '미인정결석', '기타결석', '인정 결석', // 결석류
+  '질병지각', '미인정지각', '기타지각', '인정 지각', // 지각류
+  '질병조퇴', '미인정조퇴', '기타조퇴', '인정 조퇴', // 조퇴류
+  '질병결과', '미인정결과', '기타결과', '인정 결과'  // 결과류
 ];
 
 const DEFAULT_CLEANING_ROLES = [
@@ -545,13 +545,35 @@ function updateRoleTargetCount(roleId, delta) {
 // 7. 출결 헬퍼 함수 & 분류 (결과류 포함)
 // ============================================================================
 /**
- * 구버전 명칭('인정결', '병결', '미인정결')을 신규 표준('인정결석', '병결석', '미인정결석')으로 정규화
+ * 구버전 명칭 및 비표준 띄어쓰기를 담임확인서 표준(질병결석, 미인정결석, 기타결석, 인정 결석 등)으로 정규화
  */
 function normalizeAttendanceStatus(statusStr) {
-  if (!statusStr) return '출석';
-  if (statusStr === '인정결') return '인정결석';
-  if (statusStr === '병결') return '병결석';
-  if (statusStr === '미인정결') return '미인정결석';
+  if (!statusStr || statusStr === '출석') return '출석';
+
+  // 1) 결석류 매핑
+  if (statusStr === '병결' || statusStr === '병결석' || statusStr === '질병결석') return '질병결석';
+  if (statusStr === '미인정결' || statusStr === '미인정결석') return '미인정결석';
+  if (statusStr === '기타결석') return '기타결석';
+  if (statusStr === '인정결' || statusStr === '인정결석' || statusStr === '인정 결석') return '인정 결석';
+
+  // 2) 지각류 매핑
+  if (statusStr === '병지각' || statusStr === '질병지각') return '질병지각';
+  if (statusStr === '미인정지각') return '미인정지각';
+  if (statusStr === '기타지각') return '기타지각';
+  if (statusStr === '인정지각' || statusStr === '인정 지각') return '인정 지각';
+
+  // 3) 조퇴류 매핑
+  if (statusStr === '병조퇴' || statusStr === '질병조퇴') return '질병조퇴';
+  if (statusStr === '미인정조퇴') return '미인정조퇴';
+  if (statusStr === '기타조퇴') return '기타조퇴';
+  if (statusStr === '인정조퇴' || statusStr === '인정 조퇴') return '인정 조퇴';
+
+  // 4) 결과류 매핑
+  if (statusStr === '병결과' || statusStr === '질병결과') return '질병결과';
+  if (statusStr === '미인정결과') return '미인정결과';
+  if (statusStr === '기타결과') return '기타결과';
+  if (statusStr === '인정결과' || statusStr === '인정 결과') return '인정 결과';
+
   return statusStr;
 }
 
@@ -843,8 +865,26 @@ function bindTableEvents() {
       e.target.dataset.type = category;
       setStudentAttendance(studentId, changedPeriod, newStatus);
 
-      // 2) [핵심 기능 1] 결석류 또는 조퇴류인 경우 이후 교시들 자동 일괄 적용!
-      if (category === 'absent' || category === 'early') {
+      // 2) [핵심 자동 연쇄 기능] 출결 유형별 맞춤형 자동 일괄 동기화
+      // 2-1) [결석류: 전 교시 일괄 적용] 어떤 교시든 결석을 누르면 당일 전체(조례~마지막교시)가 해당 결석으로 자동 변경!
+      if (category === 'absent') {
+        const periods = getPeriodsForDate(appState.selectedDate);
+        periods.forEach((p) => {
+          setStudentAttendance(studentId, p, newStatus);
+
+          const selectEl = tbody.querySelector(
+            `select.select-attendance[data-student-id="${studentId}"][data-period="${p}"]`
+          );
+          if (selectEl) {
+            selectEl.value = newStatus;
+            selectEl.dataset.status = newStatus;
+            selectEl.dataset.type = category;
+          }
+        });
+        showToast(`${studentId}번: [${newStatus}] 지정으로 당일 모든 교시가 일괄 결석 처리되었습니다.`, 'info');
+      }
+      // 2-2) [조퇴류: 이후 교시 자동 적용] 체크한 교시부터 끝까지 이후 교시들을 조퇴로 자동 변경
+      else if (category === 'early') {
         const periods = getPeriodsForDate(appState.selectedDate);
         const currIdx = periods.indexOf(changedPeriod);
 
@@ -853,7 +893,6 @@ function bindTableEvents() {
             const nextPeriod = periods[i];
             setStudentAttendance(studentId, nextPeriod, newStatus);
 
-            // 해당 행의 이후 셀렉트박스 DOM도 즉시 동기화
             const nextSelect = tbody.querySelector(
               `select.select-attendance[data-student-id="${studentId}"][data-period="${nextPeriod}"]`
             );
@@ -863,10 +902,10 @@ function bindTableEvents() {
               nextSelect.dataset.type = category;
             }
           }
-          showToast(`${studentId}번: ${changedPeriod} [${newStatus}] 지정으로 이후 교시가 자동 적용되었습니다.`, 'info');
+          showToast(`${studentId}번: ${changedPeriod}부터 이후 교시가 [${newStatus}] 자동 적용되었습니다.`, 'info');
         }
       }
-      // 2-2) [핵심 기능 2] 지각류인 경우 그 앞의 모든 이전 교시들 자동 일괄 적용! (예: 3교시 지각 -> 조례,1,2교시도 지각)
+      // 2-3) [지각류: 앞선 교시 자동 적용] 체크한 교시까지 그 앞의 모든 이전 교시들을 지각으로 자동 변경
       else if (category === 'tardy') {
         const periods = getPeriodsForDate(appState.selectedDate);
         const currIdx = periods.indexOf(changedPeriod);
@@ -876,7 +915,6 @@ function bindTableEvents() {
             const prevPeriod = periods[i];
             setStudentAttendance(studentId, prevPeriod, newStatus);
 
-            // 해당 행의 이전 셀렉트박스 DOM도 즉시 동기화
             const prevSelect = tbody.querySelector(
               `select.select-attendance[data-student-id="${studentId}"][data-period="${prevPeriod}"]`
             );
@@ -886,7 +924,7 @@ function bindTableEvents() {
               prevSelect.dataset.type = category;
             }
           }
-          showToast(`${studentId}번: ${changedPeriod} [${newStatus}] 지정으로 앞선 교시들이 자동 적용되었습니다.`, 'info');
+          showToast(`${studentId}번: ${changedPeriod}까지 앞선 교시들이 [${newStatus}] 자동 적용되었습니다.`, 'info');
         }
       }
 
@@ -2077,19 +2115,19 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
     ['생리통', '', '질병결석'],
     ['현장체험학습', '', '미인정결석'],
     ['대회출전', '', '기타결석'],
-    ['', '', '인정결석'],
+    ['', '', '인정 결석'],
     ['', '', '질병지각'],
     ['', '', '미인정지각'],
     ['', '', '기타지각'],
-    ['', '', '인정지각'],
+    ['', '', '인정 지각'],
     ['', '', '질병조퇴'],
     ['', '', '미인정조퇴'],
     ['', '', '기타조퇴'],
-    ['', '', '인정조퇴'],
+    ['', '', '인정 조퇴'],
     ['', '', '질병결과'],
     ['', '', '미인정결과'],
     ['', '', '기타결과'],
-    ['', '', '인정결과']
+    ['', '', '인정 결과']
   ];
 
   // 5. Sheet 4: 현재 좌석 및 청소 역할 배정 현황 (소속 모둠 포함)

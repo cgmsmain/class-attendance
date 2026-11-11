@@ -960,12 +960,29 @@ function bindTableEvents() {
   const tbody = document.getElementById('attendanceTableBody');
   if (!tbody) return;
 
+  const updatePeriodSelectUI = (sid, p, status) => {
+    const el = tbody.querySelector(
+      `select.select-attendance[data-student-id="${sid}"][data-period="${p}"]`
+    );
+    if (el) {
+      const cat = getStatusCategory(status);
+      el.value = status;
+      el.dataset.status = status;
+      el.dataset.type = cat;
+    }
+  };
+
   tbody.querySelectorAll('.select-attendance').forEach((select) => {
     select.addEventListener('change', (e) => {
       const studentId = parseInt(e.target.dataset.studentId, 10);
       const changedPeriod = e.target.dataset.period;
       const newStatus = e.target.value;
       const category = getStatusCategory(newStatus);
+      const periods = getPeriodsForDate(appState.selectedDate);
+      const currentRecords = getStudentAttendance(studentId, appState.selectedDate);
+
+      // 변경 전 상태 확인 (결석 해제 등 판별용)
+      const hadAbsent = periods.some(p => getStatusCategory(currentRecords[p]) === 'absent');
 
       // 1) 현재 셀 변경
       e.target.dataset.status = newStatus;
@@ -975,63 +992,78 @@ function bindTableEvents() {
       // 2) [핵심 자동 연쇄 기능] 출결 유형별 맞춤형 자동 일괄 동기화
       // 2-1) [결석류: 전 교시 일괄 적용] 어떤 교시든 결석을 누르면 당일 전체(조례~마지막교시)가 해당 결석으로 자동 변경!
       if (category === 'absent') {
-        const periods = getPeriodsForDate(appState.selectedDate);
         periods.forEach((p) => {
           setStudentAttendance(studentId, p, newStatus);
-
-          const selectEl = tbody.querySelector(
-            `select.select-attendance[data-student-id="${studentId}"][data-period="${p}"]`
-          );
-          if (selectEl) {
-            selectEl.value = newStatus;
-            selectEl.dataset.status = newStatus;
-            selectEl.dataset.type = category;
-          }
+          updatePeriodSelectUI(studentId, p, newStatus);
         });
         showToast(`${studentId}번: [${newStatus}] 지정으로 당일 모든 교시가 일괄 결석 처리되었습니다.`, 'info');
       }
       // 2-2) [조퇴류: 이후 교시 자동 적용] 체크한 교시부터 끝까지 이후 교시들을 조퇴로 자동 변경
       else if (category === 'early') {
-        const periods = getPeriodsForDate(appState.selectedDate);
         const currIdx = periods.indexOf(changedPeriod);
 
         if (currIdx !== -1 && currIdx < periods.length - 1) {
           for (let i = currIdx + 1; i < periods.length; i++) {
             const nextPeriod = periods[i];
             setStudentAttendance(studentId, nextPeriod, newStatus);
-
-            const nextSelect = tbody.querySelector(
-              `select.select-attendance[data-student-id="${studentId}"][data-period="${nextPeriod}"]`
-            );
-            if (nextSelect) {
-              nextSelect.value = newStatus;
-              nextSelect.dataset.status = newStatus;
-              nextSelect.dataset.type = category;
-            }
+            updatePeriodSelectUI(studentId, nextPeriod, newStatus);
           }
           showToast(`${studentId}번: ${changedPeriod}부터 이후 교시가 [${newStatus}] 자동 적용되었습니다.`, 'info');
         }
       }
-      // 2-3) [지각류: 앞선 교시 자동 적용] 체크한 교시까지 그 앞의 모든 이전 교시들을 지각으로 자동 변경
+      // 2-3) [지각류: 앞선 교시 지각 + 이후 교시 출석 자동 전환!]
+      // 결석 상태이거나 다른 상태여도 지각을 누르면 조례~해당교시까지 지각, 해당교시 다음부터 끝까지 '출석'으로 일괄 정리!
       else if (category === 'tardy') {
-        const periods = getPeriodsForDate(appState.selectedDate);
         const currIdx = periods.indexOf(changedPeriod);
 
-        if (currIdx > 0) {
-          for (let i = 0; i < currIdx; i++) {
-            const prevPeriod = periods[i];
-            setStudentAttendance(studentId, prevPeriod, newStatus);
+        // 1. 조례(0번)부터 해당 교시까지 모두 동일한 지각 적용
+        for (let i = 0; i <= currIdx; i++) {
+          const prevPeriod = periods[i];
+          setStudentAttendance(studentId, prevPeriod, newStatus);
+          updatePeriodSelectUI(studentId, prevPeriod, newStatus);
+        }
 
-            const prevSelect = tbody.querySelector(
-              `select.select-attendance[data-student-id="${studentId}"][data-period="${prevPeriod}"]`
-            );
-            if (prevSelect) {
-              prevSelect.value = newStatus;
-              prevSelect.dataset.status = newStatus;
-              prevSelect.dataset.type = category;
+        // 2. 해당 교시 이후(다음 교시부터 마지막 교시까지)는 모두 '출석'으로 자동 전환!
+        for (let i = currIdx + 1; i < periods.length; i++) {
+          const nextPeriod = periods[i];
+          setStudentAttendance(studentId, nextPeriod, '출석');
+          updatePeriodSelectUI(studentId, nextPeriod, '출석');
+        }
+
+        if (currIdx < periods.length - 1) {
+          const nextP = periods[currIdx + 1];
+          showToast(`${studentId}번: 조례~${changedPeriod} [${newStatus}], ${nextP}부터 [출석]으로 자동 적용되었습니다.`, 'info');
+        } else {
+          showToast(`${studentId}번: 조례~${changedPeriod} [${newStatus}] 자동 적용되었습니다.`, 'info');
+        }
+      }
+      // 2-4) [출석으로 변경 시]: 결석/조퇴 상태에서 출석으로 변경할 때 전 교시 자동 연쇄 해제
+      else if (newStatus === '출석') {
+        // A. 기존에 당일 결석류 상태였던 경우 -> 결석을 해제하고 전 교시를 '출석'으로 일괄 전환!
+        if (hadAbsent) {
+          periods.forEach((p) => {
+            setStudentAttendance(studentId, p, '출석');
+            updatePeriodSelectUI(studentId, p, '출석');
+          });
+          showToast(`${studentId}번: 결석 해제 - 당일 모든 교시가 [출석]으로 일괄 전환되었습니다.`, 'info');
+        }
+        // B. 기존에 조퇴 상태에서 조퇴 시작 교시를 출석으로 바꾼 경우 -> 이후 조퇴 교시들도 '출석'으로 자동 복원
+        else {
+          const currIdx = periods.indexOf(changedPeriod);
+          if (currIdx !== -1 && currIdx < periods.length - 1) {
+            let clearedEarly = false;
+            for (let i = currIdx + 1; i < periods.length; i++) {
+              const nextPeriod = periods[i];
+              if (getStatusCategory(currentRecords[nextPeriod]) === 'early') {
+                setStudentAttendance(studentId, nextPeriod, '출석');
+                updatePeriodSelectUI(studentId, nextPeriod, '출석');
+                clearedEarly = true;
+              }
+            }
+            if (clearedEarly) {
+              showToast(`${studentId}번: 조퇴 해제 - 이후 교시들이 [출석]으로 복원되었습니다.`, 'info');
             }
           }
-          showToast(`${studentId}번: ${changedPeriod}까지 앞선 교시들이 [${newStatus}] 자동 적용되었습니다.`, 'info');
         }
       }
 
@@ -1040,6 +1072,9 @@ function bindTableEvents() {
       updateTableRowSummary(studentId);
       updateTotalSummaryCounts();
       renderSeats();
+
+      // 전자칠판 터치/선택 직후 포커스 해제 -> 상태별 고유 색상 뱃지로 깔끔 복귀
+      e.target.blur();
     });
   });
 
@@ -1061,6 +1096,7 @@ function bindTableEvents() {
           showToast(`${studentId}번: 사유가 초기화(빈칸)되었습니다.`, 'info');
         }
       }
+      select.blur();
     });
   });
 }
@@ -2375,23 +2411,33 @@ function handleToggleSeatMode() {
     showToast(`모둠 모드 전환: [${appState.groupCount}개 모둠]으로 균등하게 무작위(랜덤) 배분되었습니다. 드래그로 자리 이동 및 교환이 가능합니다.`, 'info');
   } else {
     // 모둠 모드 -> 일반 대형 복귀 시:
-    // 모둠 모드에서 이동/스왑된 배치를 일반 좌석에도 부드럽게 동기화
-    syncGroupSeatsToNormalSeats();
+    // 모둠 모드 진입 전 원래 일반 좌석 배치를 그대로 유지
     appState.seatMode = 'grid';
     saveStateImmediately();
     renderSeats();
-    showToast('일반 대형으로 전환되었습니다.', 'info');
+    showToast('일반 대형으로 전환되었습니다. (기존 자리 배치가 유지됩니다)', 'info');
   }
 }
 
-function syncGroupSeatsToNormalSeats() {
-  const allGroupStudents = (appState.groupSeats || []).flat();
-  let gIdx = 0;
+/**
+ * 일반 좌석 무작위(랜덤) 재배치:
+ * - 사용 안 하는 자리(appState.disabledSeats, 🚫)는 그대로 비워두고 유효 좌석에만 배정
+ * - 전체 학생 번호를 무작위로 섞어 순차 배정
+ */
+function shuffleNormalSeatsRandomly() {
+  if (!confirm('현재 좌석을 무작위(랜덤)로 재배치하시겠습니까?\n(※ 사용 안 하는 자리(🚫)는 그대로 비워두고 배정됩니다)')) {
+    return;
+  }
+  const studentIds = shuffleArray(appState.students.map(s => s.id));
+  let sIdx = 0;
   appState.seats = appState.seats.map((sid, idx) => {
     if (appState.disabledSeats.includes(idx)) return null;
-    if (gIdx < allGroupStudents.length) return allGroupStudents[gIdx++];
+    if (sIdx < studentIds.length) return studentIds[sIdx++];
     return null;
   });
+  saveStateImmediately();
+  renderSeats();
+  showToast('자리 배치가 무작위(랜덤)로 완료되었습니다!', 'success');
 }
 
 function executeMonthlyReset() {
@@ -2897,6 +2943,13 @@ function setupEventListeners() {
       saveStateImmediately();
       renderSeats();
       showToast(`좌석 배치가 [${appState.seatCols}열 × ${newRows}행]으로 변경되었습니다.`, 'info');
+    });
+  }
+
+  const btnReshuffleSeats = document.getElementById('btnReshuffleSeats');
+  if (btnReshuffleSeats) {
+    btnReshuffleSeats.addEventListener('click', () => {
+      shuffleNormalSeatsRandomly();
     });
   }
 

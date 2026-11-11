@@ -238,11 +238,11 @@
           <span class="hint-item"><span class="legend-box lg-early"></span>조퇴류</span>
           <span class="hint-item"><span class="legend-box lg-skip"></span>결과류</span>
           <span id="weekdayHintText" class="hint-item schedule-text">월·수·금 6교시 / 화·목 7교시</span>
-          <span class="hint-item auto-cascade-hint">💡 결석: 당일 전체 일괄 적용 | 조퇴: 이후 교시 자동 적용 | 지각: 앞선 교시 자동 적용</span>
+          <span class="hint-item auto-cascade-hint">💡 결석: 당일 전체 일괄 적용 | 지각: 앞선 교시 지각 + 이후 교시 출석 자동 전환 | 조퇴: 이후 교시 자동 적용 | 결석 시 출석 선택: 전 교시 출석 일괄 해제</span>
         </div>
       </section>
 
-      <!-- 2 & 3. 우측 50%: 상단 좌석 배치도(오른쪽 아래 1번 시작) + 하단 청소 역할 배정표(정원 반영 랜덤 분배) -->
+      <!-- 2 & 3. 우측 40%: 상단 좌석 배치도(오른쪽 아래 1번 시작) + 하단 청소 역할 배정표(정원 반영 랜덤 분배) -->
       <section class="panel-right-split">
         <!-- 우측 상단 (54% 높이): 교사 시점 좌석 배치도 (오른쪽 아래 1번 -> 왼쪽으로 증가) -->
         <div class="panel panel-seat">
@@ -265,8 +265,8 @@
 
             <!-- 좌석 배치 설정 (가로/세로 지정, 모둠 수 지정 & 출결 기준) -->
             <div class="seat-controls">
-              <!-- 일반 모드 크기 조절 (가로 열 × 세로 행) -->
-              <div id="seatDimensionControl" class="seat-dimension-wrap" title="일반 모드 가로 열 수와 세로 행 수를 지정합니다">
+              <!-- 일반 모드 크기 조절 (가로 열 × 세로 행) 및 수동 랜덤 재배치 -->
+              <div id="seatDimensionControl" class="seat-dimension-wrap" title="일반 모드 가로 열 수와 세로 행 수를 지정하고 수동으로 무작위 재배치합니다">
                 <span class="dim-label">배열:</span>
                 <select id="seatColsSelect" class="select-dim">
                   <option value="4">4열</option>
@@ -283,6 +283,9 @@
                   <option value="7">7행</option>
                   <option value="8">8행</option>
                 </select>
+                <button type="button" id="btnReshuffleSeats" class="btn-seat-reshuffle" title="사용 안 하는 자리(🚫)는 비워두고 전체 학생을 무작위(랜덤)로 좌석에 재배치합니다">
+                  🎲 자리 랜덤 배정
+                </button>
               </div>
 
               <!-- 모둠 모드 설정: 모둠 수 지정 및 랜덤 재배치 버튼 -->

@@ -710,9 +710,29 @@ body {
   line-height: 1;
 }
 
-.select-reason:focus {
-  border-color: #38bdf8;
-  box-shadow: 0 0 5px rgba(56, 189, 248, 0.4);
+.select-reason:focus,
+.select-reason:active,
+.select-reason[data-has-reason="true"]:focus,
+.select-reason[data-has-reason="true"]:active {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #0284c7 !important;
+  box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.45) !important;
+  font-weight: 800 !important;
+}
+
+.select-reason option {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  padding: 5px 8px !important;
+}
+
+.select-reason option:checked {
+  background-color: #0284c7 !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
 }
 
 .select-reason[data-has-reason="true"] {
@@ -743,9 +763,33 @@ body {
   line-height: 1;
 }
 
-.select-attendance:focus {
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 5px rgba(96, 165, 250, 0.4);
+/* 출결 이벤트가 기록되어 있어도 다시 누르면(포커스/터치 시) 최초처럼 흰색 바탕 + 검은색 글씨로 시인성 극대화 */
+.select-attendance:focus,
+.select-attendance:active,
+.select-attendance[data-status]:focus,
+.select-attendance[data-type]:focus,
+.select-attendance[data-status]:active,
+.select-attendance[data-type]:active {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  border-color: #2563eb !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.45) !important;
+  font-weight: 800 !important;
+}
+
+/* 드롭다운 메뉴 열렸을 때 모든 16개 출결 옵션: 항상 흰색 배경에 진한 검은색 글씨 */
+.select-attendance option {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-size: 0.82rem !important;
+  font-weight: 700 !important;
+  padding: 5px 8px !important;
+}
+
+.select-attendance option:checked {
+  background-color: #2563eb !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
 }
 
 /* 상태별 셀렉트 박스 색상 (부드러운 파스텔 톤) */
@@ -887,12 +931,13 @@ body {
   border: 1px solid var(--border-subtle);
 }
 
+.btn-seat-reshuffle,
 .btn-group-reshuffle {
   background: rgba(56, 189, 248, 0.15);
   color: var(--accent-blue);
   border: 1px solid rgba(56, 189, 248, 0.35);
   border-radius: 3px;
-  padding: 1px 5px;
+  padding: 1px 6px;
   font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
@@ -900,6 +945,7 @@ body {
   line-height: 1.2;
 }
 
+.btn-seat-reshuffle:hover,
 .btn-group-reshuffle:hover {
   background: rgba(56, 189, 248, 0.3);
   border-color: var(--accent-blue);

@@ -412,18 +412,22 @@ body {
 }
 
 .panel-left {
-  width: 50%;
+  flex: 6;
+  width: calc(60% - 2px);
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .panel-right-split {
-  width: 50%;
+  flex: 4;
+  width: calc(40% - 2px);
   height: 100%;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
 }
 
 .panel-seat {
@@ -678,6 +682,44 @@ body {
 .col-status {
   width: 58px;
   font-weight: 700;
+}
+
+.col-reason {
+  width: 82px;
+  font-weight: 700;
+}
+
+.select-reason {
+  width: 98%;
+  height: calc(100% - 2px);
+  max-height: 20px;
+  min-height: 16px;
+  padding: 0 1px;
+  font-family: inherit;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: 3px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  outline: none;
+  cursor: pointer;
+  text-align: center;
+  text-align-last: center;
+  transition: all 0.12s ease;
+  background-color: #1a2334;
+  color: #94a3b8;
+  line-height: 1;
+}
+
+.select-reason:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 5px rgba(56, 189, 248, 0.4);
+}
+
+.select-reason[data-has-reason="true"] {
+  background-color: rgba(56, 189, 248, 0.16);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.45);
+  font-weight: 800;
 }
 
 .select-attendance {
@@ -1889,4 +1931,294 @@ body {
   background: #10b981;
   box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
 }
+
+/* ============================================================================
+   시간표 및 요일별 교시 설정 모달 스타일
+   ============================================================================ */
+.modal-card-schedule {
+  max-width: 580px;
+  width: 94%;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-icon-wrap.clock {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.18);
+  color: #38bdf8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.modal-icon-wrap.clock svg {
+  width: 20px;
+  height: 20px;
+}
+
+.schedule-modal-body {
+  overflow-y: auto;
+  max-height: calc(88vh - 130px);
+  padding-right: 4px;
+}
+.schedule-modal-body::-webkit-scrollbar {
+  width: 5px;
+}
+.schedule-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.3);
+  border-radius: 4px;
+}
+
+.weekday-period-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.weekday-period-card {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-md);
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  transition: border-color 0.15s ease;
+}
+.weekday-period-card:hover {
+  border-color: rgba(96, 165, 250, 0.4);
+}
+
+.weekday-name {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+}
+.weekday-name.highlight-day {
+  color: #38bdf8;
+}
+
+.weekday-select {
+  width: 100%;
+  text-align: center;
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 3px 1px;
+  height: 28px;
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  outline: none;
+  cursor: pointer;
+}
+.weekday-select:focus {
+  border-color: var(--accent-blue);
+}
+
+.section-title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.preset-btn-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.preset-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.btn-preset {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: rgba(51, 65, 85, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-sm);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.btn-preset:hover {
+  background: #2563eb;
+  color: #ffffff;
+  border-color: #3b82f6;
+}
+.btn-preset:active {
+  transform: scale(0.97);
+}
+
+.period-times-table-wrap {
+  margin-top: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.4);
+}
+
+.period-times-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.76rem;
+  text-align: center;
+}
+.period-times-table th {
+  background: rgba(30, 41, 59, 0.85);
+  padding: 6px 4px;
+  color: #94a3b8;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  font-size: 0.72rem;
+}
+.period-times-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+  vertical-align: middle;
+}
+.period-time-input {
+  background: #0f172a;
+  color: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: 0.76rem;
+  font-family: monospace;
+  outline: none;
+  width: 108px;
+  text-align: center;
+}
+.period-time-input:focus {
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 5px rgba(96, 165, 250, 0.3);
+}
+
+.period-duration-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.12);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+}
+.period-duration-badge.invalid {
+  color: #fb7185;
+  background: rgba(251, 113, 133, 0.15);
+}
+
+.schedule-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 14px;
+}
+.schedule-modal-footer .footer-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-secondary-outline {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: #94a3b8;
+}
+.btn-secondary-outline:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: #f1f5f9;
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.badge-clickable {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.badge-clickable:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60a5fa;
+  color: #ffffff;
+}
+
+.btn-schedule-gear {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 2px 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  height: 20px;
+}
+.btn-schedule-gear svg {
+  width: 11px;
+  height: 11px;
+}
+.btn-schedule-gear:hover {
+  background: rgba(59, 130, 246, 0.25);
+  border-color: #60a5fa;
+  color: #ffffff;
+}
+
+/* ============================================================================
+   사유 직접 입력 모달 스타일
+   ============================================================================ */
+.modal-card-sm {
+  max-width: 380px;
+  width: 90%;
+}
+
+.quick-reason-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.quick-tag-label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-weight: 600;
+}
+
+.btn-reason-tag {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: rgba(51, 65, 85, 0.5);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: var(--radius-sm);
+  color: #cbd5e1;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.btn-reason-tag:hover {
+  background: rgba(56, 189, 248, 0.2);
+  border-color: #38bdf8;
+  color: #ffffff;
+}
+
+.btn-reason-tag:active {
+  transform: scale(0.96);
+}
+
+
 

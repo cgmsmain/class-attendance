@@ -118,7 +118,15 @@
             <span>매월 1일 리셋</span>
           </button>
 
-          <button id="btnExportExcel" class="btn btn-excel" title="나이스(NEIS) RPA용 엑셀 추출: 현황 제외, 조례부터 요일별 마지막 교시(월수금 6교시, 화목 7교시)까지만 깔끔하게 다운로드합니다">
+          <button id="btnHeaderScheduleModal" class="btn btn-secondary" title="요일별 전체 교시 수 및 교시별 시작/종료 시각 설정">
+            <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            <span>시간표 설정</span>
+          </button>
+
+          <button id="btnExportExcel" class="btn btn-excel" title="나이스(NEIS) RPA용 엑셀 추출: 현황 제외, 조례부터 요일별 마지막 교시까지만 깔끔하게 다운로드합니다">
             <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
@@ -150,7 +158,7 @@
 
     <!-- 3분할 메인 콘텐츠 (100% 무스크롤 뷰포트 피팅) -->
     <main class="main-layout">
-      <!-- 1. 좌측 50%: 실시간 출석 체크 패널 (월수금 6교시 / 화목 7교시, 결과류 포함, 결석/조퇴 이후 교시 자동 반영) -->
+      <!-- 1. 좌측 50%: 실시간 출석 체크 패널 (요일별 교시 동적 연동, 결과류 포함, 결석/조퇴 이후 교시 자동 반영) -->
       <section class="panel panel-left panel-attendance">
         <div class="panel-header">
           <div class="panel-title-wrap">
@@ -161,7 +169,14 @@
               </svg>
               실시간 출석 체크
             </h2>
-            <span id="periodScheduleBadge" class="badge-total">월수금 6교시 / 화목 7교시</span>
+            <span id="periodScheduleBadge" class="badge-total badge-clickable" title="클릭하여 요일별 교시 및 시간대 설정">월수금 6교시 / 화목 7교시</span>
+            <button id="btnOpenScheduleModal" class="btn-schedule-gear" title="요일별 전체 교시 및 교시별 시간대 설정">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              </svg>
+              <span>시간표 설정</span>
+            </button>
           </div>
 
           <div class="panel-header-actions">
@@ -546,6 +561,167 @@
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             <span>엑셀 다운로드 실행</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모달: 요일별 전체 교시 및 교시별 시간대 설정 -->
+    <div id="scheduleSettingsModal" class="modal-backdrop hidden">
+      <div class="modal-card modal-card-schedule">
+        <div class="modal-header">
+          <div class="modal-icon-wrap clock">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+          </div>
+          <div>
+            <h3>요일별 교시 및 시간대 설정</h3>
+            <p class="modal-subtitle">학급 운영에 맞게 요일별 전체 교시 수와 교시별 시작·종료 시각을 직접 설정합니다.</p>
+          </div>
+        </div>
+
+        <div class="modal-body schedule-modal-body">
+          <!-- 1. 요일별 전체 교시 설정 -->
+          <div class="form-group">
+            <label class="form-section-title">📅 요일별 전체 교시 설정</label>
+            <p class="section-desc">각 요일마다 운영하는 마지막 교시를 선택하세요. (기본: 월/수/금 6교시, 화/목 7교시)</p>
+            <div class="weekday-period-grid">
+              <div class="weekday-period-card">
+                <span class="weekday-name">월요일</span>
+                <select class="form-input weekday-select" id="weekdaySelect_1" data-day="1">
+                  <option value="4">4교시까지</option>
+                  <option value="5">5교시까지</option>
+                  <option value="6" selected>6교시까지</option>
+                  <option value="7">7교시까지</option>
+                  <option value="8">8교시까지</option>
+                </select>
+              </div>
+              <div class="weekday-period-card">
+                <span class="weekday-name highlight-day">화요일</span>
+                <select class="form-input weekday-select" id="weekdaySelect_2" data-day="2">
+                  <option value="4">4교시까지</option>
+                  <option value="5">5교시까지</option>
+                  <option value="6">6교시까지</option>
+                  <option value="7" selected>7교시까지</option>
+                  <option value="8">8교시까지</option>
+                </select>
+              </div>
+              <div class="weekday-period-card">
+                <span class="weekday-name">수요일</span>
+                <select class="form-input weekday-select" id="weekdaySelect_3" data-day="3">
+                  <option value="4">4교시까지</option>
+                  <option value="5">5교시까지</option>
+                  <option value="6" selected>6교시까지</option>
+                  <option value="7">7교시까지</option>
+                  <option value="8">8교시까지</option>
+                </select>
+              </div>
+              <div class="weekday-period-card">
+                <span class="weekday-name highlight-day">목요일</span>
+                <select class="form-input weekday-select" id="weekdaySelect_4" data-day="4">
+                  <option value="4">4교시까지</option>
+                  <option value="5">5교시까지</option>
+                  <option value="6">6교시까지</option>
+                  <option value="7" selected>7교시까지</option>
+                  <option value="8">8교시까지</option>
+                </select>
+              </div>
+              <div class="weekday-period-card">
+                <span class="weekday-name">금요일</span>
+                <select class="form-input weekday-select" id="weekdaySelect_5" data-day="5">
+                  <option value="4">4교시까지</option>
+                  <option value="5">5교시까지</option>
+                  <option value="6" selected>6교시까지</option>
+                  <option value="7">7교시까지</option>
+                  <option value="8">8교시까지</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. 교시별 수업 시간대 설정 -->
+          <div class="form-group" style="margin-top: 16px;">
+            <div class="section-title-row">
+              <label class="form-section-title">⏰ 교시별 수업 시간대 설정</label>
+              <div class="preset-btn-group">
+                <span class="preset-label">빠른 프리셋:</span>
+                <button type="button" class="btn-preset" data-preset="middle">중학교(45분)</button>
+                <button type="button" class="btn-preset" data-preset="high">고등학교(50분)</button>
+                <button type="button" class="btn-preset" data-preset="elem">초등학교(40분)</button>
+              </div>
+            </div>
+            <p class="section-desc">현재 시각에 맞춰 자리 배치도의 출결 상태가 실시간으로 자동 전환됩니다.</p>
+            
+            <div class="period-times-table-wrap">
+              <table class="period-times-table">
+                <thead>
+                  <tr>
+                    <th style="width: 22%;">교시</th>
+                    <th style="width: 32%;">시작 시각</th>
+                    <th style="width: 32%;">종료 시각</th>
+                    <th style="width: 14%;">시간</th>
+                  </tr>
+                </thead>
+                <tbody id="periodTimesTableBody">
+                  <!-- JS에서 조례 ~ 8교시 행 렌더링 -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer schedule-modal-footer">
+          <button type="button" id="btnResetScheduleDefault" class="btn btn-secondary-outline" title="기본 시간표(중학교 45분제, 월수금 6교시/화목 7교시)로 초기화">
+            기본값 초기화
+          </button>
+          <div class="footer-actions">
+            <button type="button" id="btnCancelScheduleModal" class="btn btn-secondary">취소</button>
+            <button type="button" id="btnSaveScheduleSettings" class="btn btn-accent">
+              <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              <span>설정 저장</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 모달: 사유 직접 입력 -->
+    <div id="customReasonModal" class="modal-backdrop hidden">
+      <div class="modal-card modal-card-sm">
+        <div class="modal-header">
+          <div class="modal-icon-wrap accent">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+          </div>
+          <div>
+            <h3 id="customReasonModalTitle">사유 직접 입력</h3>
+            <p class="modal-subtitle">출결 확인서 엑셀 다운로드 시 '사유' 칸에 기재될 내용을 입력합니다.</p>
+          </div>
+        </div>
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-section-title">사유 내용 입력</label>
+            <input type="text" id="customReasonInput" class="form-input" placeholder="사유를 입력하세요 (예: 치과진료, 감기몸살, 독감 등)" maxlength="30">
+          </div>
+          <div class="quick-reason-tags">
+            <span class="quick-tag-label">추천 사유:</span>
+            <button type="button" class="btn-reason-tag" data-text="감기몸살">감기몸살</button>
+            <button type="button" class="btn-reason-tag" data-text="치과진료">치과진료</button>
+            <button type="button" class="btn-reason-tag" data-text="독감">독감</button>
+            <button type="button" class="btn-reason-tag" data-text="가정학습">가정학습</button>
+            <button type="button" class="btn-reason-tag" data-text="체험학습">체험학습</button>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" id="btnCancelCustomReason" class="btn btn-secondary">취소</button>
+          <button type="button" id="btnConfirmCustomReason" class="btn btn-accent">
+            <span>확인</span>
           </button>
         </div>
       </div>

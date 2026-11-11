@@ -45,33 +45,93 @@ function getTodayString() {
 }
 
 /**
- * 학교 교시별 표준 시간표 (분 단위 기준)
- * - 1교시: 09:00 ~ 09:45
- * - 2교시: 09:55 ~ 10:40
- * - 3교시: 10:50 ~ 11:35
- * - 4교시: 11:45 ~ 12:30 (점심시간: 12:30 ~ 13:40)
- * - 5교시: 13:40 ~ 14:25
- * - 6교시: 14:35 ~ 15:20
- * - 7교시: 15:30 ~ 16:15 (화·목)
+ * 학교 요일별 기본 교시 수 & 프리셋 시간표 설정
  */
-const PERIOD_TIMETABLE = [
-  { period: '조례', startHour: 8, startMin: 30, endHour: 9, endMin: 0, timeStr: '08:30~09:00' },
-  { period: '1교시', startHour: 9, startMin: 0, endHour: 9, endMin: 45, timeStr: '09:00~09:45' },
-  { period: '2교시', startHour: 9, startMin: 55, endHour: 10, endMin: 40, timeStr: '09:55~10:40' },
-  { period: '3교시', startHour: 10, startMin: 50, endHour: 11, endMin: 35, timeStr: '10:50~11:35' },
-  { period: '4교시', startHour: 11, startMin: 45, endHour: 12, endMin: 30, timeStr: '11:45~12:30' },
-  { period: '5교시', startHour: 13, startMin: 40, endHour: 14, endMin: 25, timeStr: '13:40~14:25' },
-  { period: '6교시', startHour: 14, startMin: 35, endHour: 15, endMin: 20, timeStr: '14:35~15:20' },
-  { period: '7교시', startHour: 15, startMin: 30, endHour: 16, endMin: 15, timeStr: '15:30~16:15' }
+// 기본 요일별 교시 수 (1: 월, 2: 화, 3: 수, 4: 목, 5: 금, 6: 토, 0: 일)
+const DEFAULT_WEEKDAY_PERIODS = {
+  1: 6, // 월 6교시
+  2: 7, // 화 7교시
+  3: 6, // 수 6교시
+  4: 7, // 목 7교시
+  5: 6, // 금 6교시
+  6: 6, // 토 6교시
+  0: 6  // 일 6교시
+};
+
+// 중학교 기본 (45분제)
+const PRESET_MIDDLE_TIMES = [
+  { period: '조례', startTime: '08:30', endTime: '09:00' },
+  { period: '1교시', startTime: '09:00', endTime: '09:45' },
+  { period: '2교시', startTime: '09:55', endTime: '10:40' },
+  { period: '3교시', startTime: '10:50', endTime: '11:35' },
+  { period: '4교시', startTime: '11:45', endTime: '12:30' },
+  { period: '5교시', startTime: '13:40', endTime: '14:25' },
+  { period: '6교시', startTime: '14:35', endTime: '15:20' },
+  { period: '7교시', startTime: '15:30', endTime: '16:15' },
+  { period: '8교시', startTime: '16:25', endTime: '17:10' }
 ];
 
+// 고등학교 기본 (50분제)
+const PRESET_HIGH_TIMES = [
+  { period: '조례', startTime: '08:30', endTime: '09:00' },
+  { period: '1교시', startTime: '09:00', endTime: '09:50' },
+  { period: '2교시', startTime: '10:00', endTime: '10:50' },
+  { period: '3교시', startTime: '11:00', endTime: '11:50' },
+  { period: '4교시', startTime: '12:00', endTime: '12:50' },
+  { period: '5교시', startTime: '13:50', endTime: '14:40' },
+  { period: '6교시', startTime: '14:50', endTime: '15:40' },
+  { period: '7교시', startTime: '15:50', endTime: '16:40' },
+  { period: '8교시', startTime: '16:50', endTime: '17:40' }
+];
+
+// 초등학교 기본 (40분제)
+const PRESET_ELEM_TIMES = [
+  { period: '조례', startTime: '08:40', endTime: '09:00' },
+  { period: '1교시', startTime: '09:00', endTime: '09:40' },
+  { period: '2교시', startTime: '09:50', endTime: '10:30' },
+  { period: '3교시', startTime: '10:40', endTime: '11:20' },
+  { period: '4교시', startTime: '11:30', endTime: '12:10' },
+  { period: '5교시', startTime: '13:10', endTime: '13:50' },
+  { period: '6교시', startTime: '14:00', endTime: '14:40' },
+  { period: '7교시', startTime: '14:50', endTime: '15:30' },
+  { period: '8교시', startTime: '15:40', endTime: '16:20' }
+];
+
+const DEFAULT_PERIOD_TIMES = PRESET_MIDDLE_TIMES;
+
 /**
- * 현재 시각에 따라 현재 교시 및 실시간 수업 상태 반환
+ * 시간 문자열("HH:MM")을 분(0~1440)으로 변환
+ */
+function timeStringToMinutes(timeStr) {
+  if (!timeStr || typeof timeStr !== 'string') return 0;
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return 0;
+  return (parseInt(parts[0], 10) || 0) * 60 + (parseInt(parts[1], 10) || 0);
+}
+
+/**
+ * 요일별 교시 목록 반환 (사용자가 설정한 요일별 교시 수 동적 반영)
+ */
+function getPeriodsForDate(dateStr = appState.selectedDate) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const day = d.getDay(); // 0: 일, 1: 월, 2: 화, 3: 수, 4: 목, 5: 금, 6: 토
+  const weekdayConfig = (appState && appState.weekdayPeriods) ? appState.weekdayPeriods : DEFAULT_WEEKDAY_PERIODS;
+  const maxPeriod = weekdayConfig[day] !== undefined ? weekdayConfig[day] : (DEFAULT_WEEKDAY_PERIODS[day] || 6);
+
+  const list = ['조례'];
+  for (let i = 1; i <= maxPeriod; i++) {
+    list.push(`${i}교시`);
+  }
+  return list;
+}
+
+/**
+ * 현재 시각에 따라 현재 교시 및 실시간 수업 상태 반환 (사용자 지정 시간표 동적 연동)
  */
 function getCurrentLivePeriodInfo(dateStr = appState.selectedDate) {
   const isToday = (dateStr === getTodayString());
   const periods = getPeriodsForDate(dateStr);
-  const hasSeventh = periods.includes('7교시');
+  const periodTimes = (appState && appState.periodTimes) ? appState.periodTimes : DEFAULT_PERIOD_TIMES;
 
   if (!isToday) {
     return {
@@ -85,114 +145,77 @@ function getCurrentLivePeriodInfo(dateStr = appState.selectedDate) {
   const now = new Date();
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
 
-  // 1) 09:00 이전: 조례 시간
-  if (currentMinutes < 540) {
+  // 현재 날짜의 교시별 시간대 설정 매핑
+  const activeConfigs = periods.map(p => {
+    const found = periodTimes.find(item => item.period === p);
+    return found || { period: p, startTime: '09:00', endTime: '09:45' };
+  });
+
+  if (activeConfigs.length === 0) {
     return {
       isToday: true,
-      period: '조례',
-      isAfterSchool: false,
-      label: '조례 시간 (08:30~09:00)'
-    };
-  }
-  // 2) 1교시 (09:00 ~ 09:45) + 쉬는시간 (09:45 ~ 09:55)
-  if (currentMinutes < 595) {
-    const isBreak = currentMinutes >= 585;
-    return {
-      isToday: true,
-      period: '1교시',
-      isAfterSchool: false,
-      label: isBreak ? '쉬는 시간 (1교시 종료)' : '1교시 진행 중 (09:00~09:45)'
-    };
-  }
-  // 3) 2교시 (09:55 ~ 10:40) + 쉬는시간 (10:40 ~ 10:50)
-  if (currentMinutes < 650) {
-    const isBreak = currentMinutes >= 640;
-    return {
-      isToday: true,
-      period: '2교시',
-      isAfterSchool: false,
-      label: isBreak ? '쉬는 시간 (2교시 종료)' : '2교시 진행 중 (09:55~10:40)'
-    };
-  }
-  // 4) 3교시 (10:50 ~ 11:35) + 쉬는시간 (11:35 ~ 11:45)
-  if (currentMinutes < 705) {
-    const isBreak = currentMinutes >= 695;
-    return {
-      isToday: true,
-      period: '3교시',
-      isAfterSchool: false,
-      label: isBreak ? '쉬는 시간 (3교시 종료)' : '3교시 진행 중 (10:50~11:35)'
-    };
-  }
-  // 5) 4교시 (11:45 ~ 12:30) + 점심시간 (12:30 ~ 13:40)
-  if (currentMinutes < 820) {
-    const isLunch = currentMinutes >= 750;
-    return {
-      isToday: true,
-      period: '4교시',
-      isAfterSchool: false,
-      label: isLunch ? '점심 시간 (4교시 기준)' : '4교시 진행 중 (11:45~12:30)'
-    };
-  }
-  // 6) 5교시 (13:40 ~ 14:25) + 쉬는시간 (14:25 ~ 14:35)
-  if (currentMinutes < 875) {
-    const isBreak = currentMinutes >= 865;
-    return {
-      isToday: true,
-      period: '5교시',
-      isAfterSchool: false,
-      label: isBreak ? '쉬는 시간 (5교시 종료)' : '5교시 진행 중 (13:40~14:25)'
-    };
-  }
-  // 7) 6교시 (14:35 ~ 15:20) + 쉬는시간 (15:20 ~ 15:30)
-  if (currentMinutes < 930) {
-    const isBreak = currentMinutes >= 920;
-    if (!hasSeventh && currentMinutes >= 920) {
-      return {
-        isToday: true,
-        period: '6교시',
-        isAfterSchool: true,
-        label: '방과 후 (당일 종합 출결)'
-      };
-    }
-    return {
-      isToday: true,
-      period: '6교시',
-      isAfterSchool: false,
-      label: isBreak ? '쉬는 시간 (6교시 종료)' : '6교시 진행 중 (14:35~15:20)'
-    };
-  }
-  // 8) 7교시 (15:30 ~ 16:15) - 화·목만 해당
-  if (hasSeventh && currentMinutes <= 975) {
-    return {
-      isToday: true,
-      period: '7교시',
-      isAfterSchool: false,
-      label: '7교시 진행 중 (15:30~16:15)'
+      period: 'auto',
+      isAfterSchool: true,
+      label: '시간표 정보 없음'
     };
   }
 
-  // 9) 모든 수업 종료 이후 (방과 후 / 종례)
+  // 1) 첫 교시(조례) 시작 전
+  const firstPeriod = activeConfigs[0];
+  const firstStartMin = timeStringToMinutes(firstPeriod.startTime);
+  if (currentMinutes < firstStartMin) {
+    return {
+      isToday: true,
+      period: firstPeriod.period,
+      isAfterSchool: false,
+      label: `등교 및 수업 준비 (${firstPeriod.startTime} 이전)`
+    };
+  }
+
+  // 2) 교시 및 쉬는 시간 / 점심 시간 순회 판별
+  for (let i = 0; i < activeConfigs.length; i++) {
+    const curr = activeConfigs[i];
+    const next = activeConfigs[i + 1];
+    const currStart = timeStringToMinutes(curr.startTime);
+    const currEnd = timeStringToMinutes(curr.endTime);
+
+    // 해당 교시 수업 진행 중
+    if (currentMinutes >= currStart && currentMinutes < currEnd) {
+      return {
+        isToday: true,
+        period: curr.period,
+        isAfterSchool: false,
+        label: `${curr.period} 진행 중 (${curr.startTime}~${curr.endTime})`
+      };
+    }
+
+    // 해당 교시 종료 후 다음 교시 시작 전 사이 (쉬는 시간 or 점심 시간)
+    if (next) {
+      const nextStart = timeStringToMinutes(next.startTime);
+      if (currentMinutes >= currEnd && currentMinutes < nextStart) {
+        const gapMinutes = nextStart - currEnd;
+        const isLunch = gapMinutes >= 35; // 35분 이상이면 점심 시간으로 표기
+        const label = isLunch 
+          ? `점심 시간 (${curr.period} 종료 / ${curr.endTime}~${next.startTime})` 
+          : `쉬는 시간 (${curr.period} 종료 / 다음: ${next.period})`;
+        return {
+          isToday: true,
+          period: curr.period,
+          isAfterSchool: false,
+          label: label
+        };
+      }
+    }
+  }
+
+  // 3) 모든 수업 종료 이후 (방과 후 / 종례)
+  const lastPeriod = activeConfigs[activeConfigs.length - 1];
   return {
     isToday: true,
-    period: hasSeventh ? '7교시' : '6교시',
+    period: lastPeriod.period,
     isAfterSchool: true,
     label: '방과 후 (당일 종합 출결)'
   };
-}
-
-/**
- * 요일별 교시 목록 반환 (월/수/금: 6교시, 화/목: 7교시)
- */
-function getPeriodsForDate(dateStr = appState.selectedDate) {
-  const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDay(); // 0: 일, 1: 월, 2: 화, 3: 수, 4: 목, 5: 금, 6: 토
-  if (day === 2 || day === 4) {
-    // 화, 목 -> 7교시까지
-    return ['조례', '1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시'];
-  }
-  // 월, 수, 금, 주말 -> 6교시까지
-  return ['조례', '1교시', '2교시', '3교시', '4교시', '5교시', '6교시'];
 }
 
 function createStudents(total) {
@@ -214,8 +237,11 @@ let appState = {
   groupCount: 6,     // 모둠 수 (3~8모둠 지원)
   groupSeats: [],    // 모둠별 학생 번호 2차원 배열 [[sid, ...], [sid, ...], ...]
   seatPeriodFilter: 'auto', // 'auto' | '조례' | '1교시' ...
+  weekdayPeriods: { ...DEFAULT_WEEKDAY_PERIODS }, // 요일별 전체 교시 수
+  periodTimes: JSON.parse(JSON.stringify(DEFAULT_PERIOD_TIMES)), // 교시별 시작/종료 시각
   students: createStudents(30),
   attendanceRecords: {}, // { [date]: { [studentId]: { [period]: '출석' } } }
+  attendanceReasons: {}, // { [date]: { [studentId]: '사유 내용' } }
   seats: Array.from({ length: 30 }, (_, i) => i + 1), // 좌석 배열 (null: 빈자리)
   disabledSeats: [], // 사용 안 하는 자리 인덱스 배열 [index, ...]
   cleaningRoles: JSON.parse(JSON.stringify(DEFAULT_CLEANING_ROLES)),
@@ -299,6 +325,33 @@ function loadStateFromStorage() {
 
       if (!Array.isArray(appState.groupSeats) || appState.groupSeats.length !== appState.groupCount) {
         distributeGroupsEqually();
+      }
+
+      // 요일별 전체 교시 설정 복원 및 유효성 검증
+      if (!appState.weekdayPeriods || typeof appState.weekdayPeriods !== 'object') {
+        appState.weekdayPeriods = { ...DEFAULT_WEEKDAY_PERIODS };
+      } else {
+        for (let d = 0; d <= 6; d++) {
+          if (appState.weekdayPeriods[d] === undefined) {
+            appState.weekdayPeriods[d] = DEFAULT_WEEKDAY_PERIODS[d] || 6;
+          }
+        }
+      }
+
+      // 교시별 시간대 설정 복원 및 유효성 검증
+      if (!Array.isArray(appState.periodTimes) || appState.periodTimes.length === 0) {
+        appState.periodTimes = JSON.parse(JSON.stringify(DEFAULT_PERIOD_TIMES));
+      } else {
+        DEFAULT_PERIOD_TIMES.forEach(def => {
+          if (!appState.periodTimes.some(pt => pt.period === def.period)) {
+            appState.periodTimes.push({ ...def });
+          }
+        });
+      }
+
+      // 사유 데이터 복원 및 유효성 검증
+      if (!appState.attendanceReasons || typeof appState.attendanceReasons !== 'object') {
+        appState.attendanceReasons = {};
       }
       return true;
     }
@@ -601,6 +654,34 @@ function setStudentAttendance(studentId, period, status, date = appState.selecte
   record[period] = normalizeAttendanceStatus(status);
 }
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function getStudentReason(studentId, date = appState.selectedDate) {
+  if (!appState.attendanceReasons) appState.attendanceReasons = {};
+  if (!appState.attendanceReasons[date]) return '';
+  return appState.attendanceReasons[date][studentId] || '';
+}
+
+function setStudentReason(studentId, reason, date = appState.selectedDate) {
+  if (!appState.attendanceReasons) appState.attendanceReasons = {};
+  if (!appState.attendanceReasons[date]) appState.attendanceReasons[date] = {};
+
+  const cleanReason = (typeof reason === 'string') ? reason.trim() : '';
+  if (cleanReason) {
+    appState.attendanceReasons[date][studentId] = cleanReason;
+  } else {
+    delete appState.attendanceReasons[date][studentId];
+  }
+}
+
 /**
  * 출결 상태 문자열을 5대 카테고리로 분류:
  * - 'class-skip': 결과류 (인정결과, 병결과, 미인정결과)
@@ -695,13 +776,15 @@ function renderAttendanceTable() {
   const day = d.getDay();
   const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
   const dayName = dayNames[day];
-  const isSevenPeriods = (day === 2 || day === 4);
+  const lastPeriod = periods[periods.length - 1];
+  const lessonCount = periods.filter(p => p !== '조례').length;
 
   if (scheduleBadge) {
-    scheduleBadge.textContent = isSevenPeriods ? `화·목 7교시제 (${dayName}요일)` : `월·수·금 6교시제 (${dayName}요일)`;
+    scheduleBadge.textContent = `${dayName}요일 ${lessonCount}교시제 (조례~${lastPeriod})`;
+    scheduleBadge.title = `클릭하여 요일별 교시 및 시간표 설정 (${dayName}요일: 조례~${lastPeriod})`;
   }
   if (weekdayHint) {
-    weekdayHint.textContent = isSevenPeriods ? `${dayName}요일: 조례 ~ 7교시 운영` : `${dayName}요일: 조례 ~ 6교시 운영`;
+    weekdayHint.textContent = `${dayName}요일: 조례 ~ ${lastPeriod} 운영`;
   }
 
   // 1) thead 동적 생성
@@ -714,6 +797,7 @@ function renderAttendanceTable() {
   });
   theadHtml += `
       <th class="col-status">현황</th>
+      <th class="col-reason">사유</th>
     </tr>
   `;
   thead.innerHTML = theadHtml;
@@ -770,6 +854,20 @@ function renderAttendanceTable() {
 
     const rowHeightPct = (100 / appState.totalStudents).toFixed(3);
 
+    const currentReason = getStudentReason(student.id, date);
+    const standardReasons = ['생리통', '두통', '복통', '병원진료'];
+    const isCustomReason = currentReason && !standardReasons.includes(currentReason);
+
+    let reasonOptionsHtml = `<option value="" ${!currentReason ? 'selected' : ''}>(빈칸)</option>`;
+    standardReasons.forEach(r => {
+      const selected = currentReason === r ? 'selected' : '';
+      reasonOptionsHtml += `<option value="${r}" ${selected}>${r}</option>`;
+    });
+    if (isCustomReason) {
+      reasonOptionsHtml += `<option value="${escapeHtml(currentReason)}" selected>${escapeHtml(currentReason)} (직접)</option>`;
+    }
+    reasonOptionsHtml += `<option value="__custom__">직접입력</option>`;
+
     rowsHtml.push(`
       <tr data-student-id="${student.id}" style="height: ${rowHeightPct}%;">
         <td class="col-num">${student.number}번</td>
@@ -778,6 +876,15 @@ function renderAttendanceTable() {
           <span class="daily-status-tag ${summaryBadgeClass}">
             ${summary.label}
           </span>
+        </td>
+        <td class="col-reason">
+          <select 
+            class="select-reason" 
+            data-student-id="${student.id}" 
+            data-has-reason="${!!currentReason}"
+            title="${student.number}번 사유 선택 (엑셀 연동)">
+            ${reasonOptionsHtml}
+          </select>
         </td>
       </tr>
     `);
@@ -933,6 +1040,27 @@ function bindTableEvents() {
       updateTableRowSummary(studentId);
       updateTotalSummaryCounts();
       renderSeats();
+    });
+  });
+
+  // 4) 사유 드롭다운 변경 이벤트
+  tbody.querySelectorAll('.select-reason').forEach((select) => {
+    select.addEventListener('change', (e) => {
+      const studentId = parseInt(e.target.dataset.studentId, 10);
+      const val = e.target.value;
+
+      if (val === '__custom__') {
+        openCustomReasonModal(studentId, select);
+      } else {
+        setStudentReason(studentId, val);
+        saveStateImmediately();
+        select.dataset.hasReason = !!val;
+        if (val) {
+          showToast(`${studentId}번: 사유가 [${val}](으)로 설정되었습니다.`, 'info');
+        } else {
+          showToast(`${studentId}번: 사유가 초기화(빈칸)되었습니다.`, 'info');
+        }
+      }
     });
   });
 }
@@ -1890,6 +2018,7 @@ function formatDateToYmd(dateObj) {
 function aggregateStudentDayConfirmationEvents(student, recordDate) {
   const dayPeriods = getPeriodsForDate(recordDate);
   const records = getStudentAttendance(student.id, recordDate);
+  const studentReason = getStudentReason(student.id, recordDate);
 
   const anomalies = [];
   dayPeriods.forEach(p => {
@@ -1906,7 +2035,7 @@ function aggregateStudentDayConfirmationEvents(student, recordDate) {
 
   const events = [];
 
-  // 1. 결석류 확인 (인정결석, 병결석, 미인정결석)
+  // 1. 결석류 확인 (질병결석, 미인정결석, 기타결석, 인정 결석)
   const absentItems = anomalies.filter(a => a.category === 'absent');
   if (absentItems.length > 0) {
     const repStatus = absentItems[0].status;
@@ -1915,7 +2044,7 @@ function aggregateStudentDayConfirmationEvents(student, recordDate) {
       number: student.number,
       name: '',
       attendance: repStatus,
-      reason: '',
+      reason: studentReason || '',
       period: '', // 결석은 교시 공란
       remarks: ''
     });
@@ -1923,7 +2052,7 @@ function aggregateStudentDayConfirmationEvents(student, recordDate) {
     return events;
   }
 
-  // 2. 지각류 확인 (인정지각, 병지각, 미인정지각)
+  // 2. 지각류 확인 (질병지각, 미인정지각, 기타지각, 인정 지각)
   const tardyItems = anomalies.filter(a => a.category === 'tardy');
   if (tardyItems.length > 0) {
     // 마지막 체크된 지각 교시 찾기 (예: 3교시 -> '3교시까지')
@@ -1933,13 +2062,13 @@ function aggregateStudentDayConfirmationEvents(student, recordDate) {
       number: student.number,
       name: '',
       attendance: lastTardy.status,
-      reason: '',
+      reason: studentReason || '',
       period: `${lastTardy.period}까지`, // '3교시까지' 한 줄 요약!
       remarks: ''
     });
   }
 
-  // 3. 조퇴류 확인 (인정조퇴, 병조퇴, 미인정조퇴)
+  // 3. 조퇴류 확인 (질병조퇴, 미인정조퇴, 기타조퇴, 인정 조퇴)
   const earlyItems = anomalies.filter(a => a.category === 'early');
   if (earlyItems.length > 0) {
     // 조퇴가 시작된 첫 교시 찾기 (예: '5교시')
@@ -1949,13 +2078,13 @@ function aggregateStudentDayConfirmationEvents(student, recordDate) {
       number: student.number,
       name: '',
       attendance: firstEarly.status,
-      reason: '',
+      reason: studentReason || '',
       period: `${firstEarly.period}부터`, // '5교시부터' 한 줄 요약!
       remarks: ''
     });
   }
 
-  // 4. 결과류 확인 (인정결과, 병결과, 미인정결과)
+  // 4. 결과류 확인 (질병결과, 미인정결과, 기타결과, 인정 결과)
   const skipItems = anomalies.filter(a => a.category === 'class-skip');
   skipItems.forEach(item => {
     events.push({
@@ -1963,7 +2092,7 @@ function aggregateStudentDayConfirmationEvents(student, recordDate) {
       number: student.number,
       name: '',
       attendance: item.status,
-      reason: '',
+      reason: studentReason || '',
       period: `${item.period}`, // '2교시', '3교시' 등
       remarks: ''
     });
@@ -2060,7 +2189,7 @@ function executeExcelExport(startDate, endDate, onlyAnomalies = true) {
           student.number,
           '',
           '출석',
-          '',
+          getStudentReason(student.id, recordDate),
           '',
           ''
         ]);
@@ -2297,6 +2426,7 @@ function executeMonthlyReset() {
 function executeYearlyFullReset() {
   // 1. 모든 누적 출결 데이터 완전 삭제
   appState.attendanceRecords = {};
+  appState.attendanceReasons = {};
 
   // 2. 좌석 배치 완전 초기화 (비활성화 해제 및 1번부터 기본 순차 배치)
   const totalSeats = (appState.seatCols || 6) * (appState.seatRows || 5);
@@ -2340,9 +2470,342 @@ function setAllPresentToday() {
 }
 
 // ============================================================================
+// 요일별 교시 및 교시별 시간대 설정 모달 엔진
+// ============================================================================
+const ALL_PERIOD_KEYS = ['조례', '1교시', '2교시', '3교시', '4교시', '5교시', '6교시', '7교시', '8교시'];
+
+function calculateDurationMinutes(startStr, endStr) {
+  const start = timeStringToMinutes(startStr);
+  const end = timeStringToMinutes(endStr);
+  return end - start;
+}
+
+function renderPeriodTimesTable(periodTimes = appState.periodTimes) {
+  const tbody = document.getElementById('periodTimesTableBody');
+  if (!tbody) return;
+
+  const currentTimes = Array.isArray(periodTimes) ? periodTimes : DEFAULT_PERIOD_TIMES;
+
+  let html = '';
+  ALL_PERIOD_KEYS.forEach(p => {
+    const config = currentTimes.find(item => item.period === p) || { period: p, startTime: '09:00', endTime: '09:45' };
+    const diff = calculateDurationMinutes(config.startTime, config.endTime);
+    const durationText = diff > 0 ? `${diff}분` : '오류';
+    const invalidClass = diff <= 0 ? 'invalid' : '';
+
+    html += `
+      <tr data-period="${p}">
+        <td><strong>${p}</strong></td>
+        <td>
+          <input type="time" class="period-time-input time-start" data-period="${p}" value="${config.startTime}">
+        </td>
+        <td>
+          <input type="time" class="period-time-input time-end" data-period="${p}" value="${config.endTime}">
+        </td>
+        <td>
+          <span class="period-duration-badge ${invalidClass}" data-period="${p}">${durationText}</span>
+        </td>
+      </tr>
+    `;
+  });
+
+  tbody.innerHTML = html;
+
+  // 실시간 분 계산 리스너 바인딩
+  tbody.querySelectorAll('.period-time-input').forEach(input => {
+    input.addEventListener('input', () => {
+      const period = input.dataset.period;
+      const row = tbody.querySelector(`tr[data-period="${period}"]`);
+      if (!row) return;
+
+      const startInput = row.querySelector('.time-start');
+      const endInput = row.querySelector('.time-end');
+      const badge = row.querySelector('.period-duration-badge');
+
+      if (startInput && endInput && badge) {
+        const diff = calculateDurationMinutes(startInput.value, endInput.value);
+        if (diff > 0) {
+          badge.textContent = `${diff}분`;
+          badge.classList.remove('invalid');
+        } else {
+          badge.textContent = '오류';
+          badge.classList.add('invalid');
+        }
+      }
+    });
+  });
+}
+
+function openScheduleSettingsModal() {
+  const modal = document.getElementById('scheduleSettingsModal');
+  if (!modal) return;
+
+  // 1. 요일별 교시 수 셀렉트 설정 (월~금: 1~5)
+  const weekdayConfig = appState.weekdayPeriods || DEFAULT_WEEKDAY_PERIODS;
+  for (let day = 1; day <= 5; day++) {
+    const select = document.getElementById(`weekdaySelect_${day}`);
+    if (select) {
+      select.value = String(weekdayConfig[day] !== undefined ? weekdayConfig[day] : (DEFAULT_WEEKDAY_PERIODS[day] || 6));
+    }
+  }
+
+  // 2. 교시별 시간대 테이블 렌더링
+  renderPeriodTimesTable(appState.periodTimes);
+
+  modal.classList.remove('hidden');
+}
+
+function closeScheduleSettingsModal() {
+  const modal = document.getElementById('scheduleSettingsModal');
+  if (modal) {
+    modal.classList.add('hidden');
+  }
+}
+
+function setupScheduleSettingsModal() {
+  const modal = document.getElementById('scheduleSettingsModal');
+  const btnOpenHeader = document.getElementById('btnHeaderScheduleModal');
+  const btnOpenLeft = document.getElementById('btnOpenScheduleModal');
+  const scheduleBadge = document.getElementById('periodScheduleBadge');
+  const btnCancel = document.getElementById('btnCancelScheduleModal');
+  const btnSave = document.getElementById('btnSaveScheduleSettings');
+  const btnReset = document.getElementById('btnResetScheduleDefault');
+
+  if (btnOpenHeader) btnOpenHeader.addEventListener('click', openScheduleSettingsModal);
+  if (btnOpenLeft) btnOpenLeft.addEventListener('click', openScheduleSettingsModal);
+  if (scheduleBadge) scheduleBadge.addEventListener('click', openScheduleSettingsModal);
+
+  if (btnCancel && modal) {
+    btnCancel.addEventListener('click', closeScheduleSettingsModal);
+  }
+
+  // 모달 바깥 배경 클릭 시 닫기
+  if (modal) {
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        closeScheduleSettingsModal();
+      }
+    });
+
+    // 프리셋 버튼 이벤트 바인딩
+    modal.querySelectorAll('.btn-preset').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const preset = e.target.dataset.preset;
+        let chosenTimes = null;
+        let presetName = '';
+
+        if (preset === 'middle') {
+          chosenTimes = PRESET_MIDDLE_TIMES;
+          presetName = '중학교(45분)';
+        } else if (preset === 'high') {
+          chosenTimes = PRESET_HIGH_TIMES;
+          presetName = '고등학교(50분)';
+        } else if (preset === 'elem') {
+          chosenTimes = PRESET_ELEM_TIMES;
+          presetName = '초등학교(40분)';
+        }
+
+        if (chosenTimes) {
+          renderPeriodTimesTable(chosenTimes);
+          showToast(`${presetName} 시간표 프리셋이 입력되었습니다. [설정 저장]을 누르면 반영됩니다.`, 'info');
+        }
+      });
+    });
+  }
+
+  // 기본값 초기화 버튼
+  if (btnReset) {
+    btnReset.addEventListener('click', () => {
+      if (confirm('요일별 교시와 시간대를 기본값(월/수/금 6교시, 화/목 7교시, 중학교 45분제)으로 초기화하시겠습니까?')) {
+        for (let day = 1; day <= 5; day++) {
+          const select = document.getElementById(`weekdaySelect_${day}`);
+          if (select) {
+            select.value = String(DEFAULT_WEEKDAY_PERIODS[day] || 6);
+          }
+        }
+        renderPeriodTimesTable(PRESET_MIDDLE_TIMES);
+        showToast('기본 시간표 양식으로 초기화되었습니다. [설정 저장]을 누르면 반영됩니다.', 'info');
+      }
+    });
+  }
+
+  // 설정 저장 버튼
+  if (btnSave && modal) {
+    btnSave.addEventListener('click', () => {
+      // 1. 요일별 교시 수 수집
+      const newWeekdayPeriods = {};
+      for (let day = 1; day <= 5; day++) {
+        const select = document.getElementById(`weekdaySelect_${day}`);
+        newWeekdayPeriods[day] = select ? parseInt(select.value, 10) : 6;
+      }
+      // 주말(토/일)은 금요일 설정과 동일하게 기본 보장
+      newWeekdayPeriods[6] = newWeekdayPeriods[5];
+      newWeekdayPeriods[0] = newWeekdayPeriods[5];
+
+      // 2. 교시별 시간대 수집 및 유효성 검사
+      const tbody = document.getElementById('periodTimesTableBody');
+      const newPeriodTimes = [];
+      let hasError = false;
+      let errorPeriod = '';
+
+      if (tbody) {
+        tbody.querySelectorAll('tr[data-period]').forEach(row => {
+          const period = row.dataset.period;
+          const startVal = row.querySelector('.time-start')?.value || '09:00';
+          const endVal = row.querySelector('.time-end')?.value || '09:45';
+
+          const diff = calculateDurationMinutes(startVal, endVal);
+          if (diff <= 0 && !hasError) {
+            hasError = true;
+            errorPeriod = period;
+          }
+
+          newPeriodTimes.push({
+            period,
+            startTime: startVal,
+            endTime: endVal
+          });
+        });
+      }
+
+      if (hasError) {
+        alert(`[${errorPeriod}]의 종료 시각이 시작 시각보다 빠르거나 같습니다. 시각을 올바르게 입력해주세요.`);
+        return;
+      }
+
+      // 상태 업데이트 & 즉시 영구 저장
+      appState.weekdayPeriods = newWeekdayPeriods;
+      appState.periodTimes = newPeriodTimes;
+      saveStateImmediately();
+
+      // UI 즉시 동기화 리렌더링
+      renderAttendanceTable();
+      renderSeatPeriodOptions();
+      updateLivePeriodBadge();
+      renderSeats();
+
+      closeScheduleSettingsModal();
+      showToast('요일별 교시 및 시간대 설정이 성공적으로 저장되었습니다!', 'success');
+    });
+  }
+}
+
+// ============================================================================
+// 사유(직접입력) 모달 엔진
+// ============================================================================
+let activeStudentIdForReason = null;
+let activeSelectElForReason = null;
+
+function renderSingleStudentReasonSelect(selectEl, studentId, currentReason) {
+  if (!selectEl) return;
+  const standardReasons = ['생리통', '두통', '복통', '병원진료'];
+  const isCustomReason = currentReason && !standardReasons.includes(currentReason);
+
+  let opts = `<option value="" ${!currentReason ? 'selected' : ''}>(빈칸)</option>`;
+  standardReasons.forEach(r => {
+    const sel = currentReason === r ? 'selected' : '';
+    opts += `<option value="${r}" ${sel}>${r}</option>`;
+  });
+  if (isCustomReason) {
+    opts += `<option value="${escapeHtml(currentReason)}" selected>${escapeHtml(currentReason)} (직접)</option>`;
+  }
+  opts += `<option value="__custom__">직접입력</option>`;
+
+  selectEl.innerHTML = opts;
+  selectEl.dataset.hasReason = !!currentReason;
+}
+
+function openCustomReasonModal(studentId, selectEl) {
+  activeStudentIdForReason = studentId;
+  activeSelectElForReason = selectEl;
+
+  const modal = document.getElementById('customReasonModal');
+  const title = document.getElementById('customReasonModalTitle');
+  const input = document.getElementById('customReasonInput');
+  if (!modal || !input) return;
+
+  const currentReason = getStudentReason(studentId);
+  if (title) title.textContent = `${studentId}번 학생 사유 직접 입력`;
+  input.value = currentReason || '';
+
+  modal.classList.remove('hidden');
+  setTimeout(() => input.focus(), 50);
+}
+
+function closeCustomReasonModal(revert = false) {
+  const modal = document.getElementById('customReasonModal');
+  if (modal) modal.classList.add('hidden');
+
+  if (revert && activeSelectElForReason && activeStudentIdForReason) {
+    const cur = getStudentReason(activeStudentIdForReason);
+    renderSingleStudentReasonSelect(activeSelectElForReason, activeStudentIdForReason, cur);
+  }
+  activeStudentIdForReason = null;
+  activeSelectElForReason = null;
+}
+
+function setupCustomReasonModal() {
+  const modal = document.getElementById('customReasonModal');
+  const input = document.getElementById('customReasonInput');
+  const btnCancel = document.getElementById('btnCancelCustomReason');
+  const btnConfirm = document.getElementById('btnConfirmCustomReason');
+  if (!modal) return;
+
+  if (btnCancel) {
+    btnCancel.addEventListener('click', () => closeCustomReasonModal(true));
+  }
+
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      closeCustomReasonModal(true);
+    }
+  });
+
+  // 추천 태그 클릭 시 인풋에 반영
+  modal.querySelectorAll('.btn-reason-tag').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      if (input) {
+        input.value = e.target.dataset.text;
+        input.focus();
+      }
+    });
+  });
+
+  const handleConfirm = () => {
+    if (!activeStudentIdForReason) return;
+    const text = input ? input.value.trim() : '';
+    setStudentReason(activeStudentIdForReason, text);
+    saveStateImmediately();
+
+    if (activeSelectElForReason) {
+      renderSingleStudentReasonSelect(activeSelectElForReason, activeStudentIdForReason, text);
+    }
+    showToast(text ? `${activeStudentIdForReason}번: 사유가 [${text}](으)로 저장되었습니다.` : `${activeStudentIdForReason}번: 사유가 초기화(빈칸)되었습니다.`, 'info');
+    closeCustomReasonModal(false);
+  };
+
+  if (btnConfirm) {
+    btnConfirm.addEventListener('click', handleConfirm);
+  }
+
+  if (input) {
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handleConfirm();
+      } else if (e.key === 'Escape') {
+        closeCustomReasonModal(true);
+      }
+    });
+  }
+}
+
+// ============================================================================
 // 14. UI 이벤트 리스너 등록
 // ============================================================================
 function setupEventListeners() {
+  setupScheduleSettingsModal();
+  setupCustomReasonModal();
   const dateInput = document.getElementById('dateSelect');
   if (dateInput) {
     dateInput.value = appState.selectedDate;
@@ -2397,6 +2860,9 @@ function setupEventListeners() {
 
       if (confirm(confirmMsg)) {
         delete appState.attendanceRecords[date];
+        if (appState.attendanceReasons) {
+          delete appState.attendanceReasons[date];
+        }
         saveStateImmediately();
         renderAttendanceTable();
         renderSeats();
